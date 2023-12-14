@@ -1,4 +1,4 @@
-files/
+logs/
 *.tar.gz
 *firebase*.json
 *.csv
