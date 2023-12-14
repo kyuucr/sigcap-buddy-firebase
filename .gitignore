@@ -1,0 +1,6 @@
+files/
+*.tar.gz
+*firebase*.json
+*.csv
+*.pdf
+*.png
