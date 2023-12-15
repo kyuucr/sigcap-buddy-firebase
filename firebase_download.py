@@ -25,7 +25,7 @@ def download(args):
     all_files = [file.name for file in bucket.list_blobs()]
     to_download = list(filter(lambda x: not logdir.joinpath(x).exists(),
                               all_files))
-    logging.info("Found %d files to download", len(to_download))
+    print("Found %d files to download" % len(to_download))
     logging.debug(to_download)
 
     results = transfer_manager.download_many_to_path(
@@ -41,13 +41,13 @@ def download(args):
             logging.warning("Failed to download %s due to exception: %s",
                             name, result)
         else:
-            logging.info("Downloaded %s from %s.", name, bucket.name)
+            print("Downloaded %s from %s." % (name, bucket.name))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--log-dir", default="./logs",
-                        help="Specify local log directory, default is './logs'")
+                        help="Specify local log directory, default='./logs'")
     parser.add_argument("-l", "--log-level", default="warning",
                         help="Provide logging level, default is warning'")
     args = parser.parse_args()
