@@ -26,56 +26,64 @@ df = df.sort_values("timestamp")
 macs = df.mac.unique()
 
 for mac in macs:
-    df_iperf = df[(df["type"] == "iperf") & (df["mac"] == mac)]
-    df_speedtest = df[(df["type"] == "speedtest") & (df["mac"] == mac)]
+    df_iperf_eth = df[(df["type"] == "iperf")
+                      & (df["mac"] == mac)
+                      & (df["interface"] == "eth0")]
+    df_iperf_wlan = df[(df["type"] == "iperf")
+                       & (df["mac"] == mac)
+                       & (df["interface"] == "wlan0")]
+    df_speedtest_eth = df[(df["type"] == "speedtest")
+                          & (df["mac"] == mac)
+                          & (df["interface"] == "eth0")]
+    df_speedtest_wlan = df[(df["type"] == "speedtest")
+                           & (df["mac"] == mac)
+                           & (df["interface"] == "wlan0")]
 
     # DL
     fig, ax = plt.subplots(figsize=(12, 4))
 
-    ax.plot(
-        df_iperf[
-            (df_iperf["direction"] == "downlink")
-            & (df_iperf["interface"] == "eth0")]["timestamp"],
-        df_iperf[
-            (df_iperf["direction"] == "downlink")
-            & (df_iperf["interface"] == "eth0")]["tput_mbps"],
-        "b-",
-        label="iperf DL Eth",
-        linewidth=2,
-        markersize=12)
-    ax.plot(
-        df_iperf[
-            (df_iperf["direction"] == "downlink")
-            & (df_iperf["interface"] == "wlan0")]["timestamp"],
-        df_iperf[
-            (df_iperf["direction"] == "downlink")
-            & (df_iperf["interface"] == "wlan0")]["tput_mbps"],
-        "b--",
-        label="iperf DL WLAN",
-        linewidth=2,
-        markersize=12)
-    ax.plot(
-        df_speedtest[
-            (df_speedtest["direction"] == "downlink")
-            & (df_speedtest["interface"] == "eth0")]["timestamp"],
-        df_speedtest[
-            (df_speedtest["direction"] == "downlink")
-            & (df_speedtest["interface"] == "eth0")]["tput_mbps"],
-        "g-",
-        label="Ookla DL Eth",
-        linewidth=2,
-        markersize=12)
-    ax.plot(
-        df_speedtest[
-            (df_speedtest["direction"] == "downlink")
-            & (df_speedtest["interface"] == "wlan0")]["timestamp"],
-        df_speedtest[
-            (df_speedtest["direction"] == "downlink")
-            & (df_speedtest["interface"] == "wlan0")]["tput_mbps"],
-        "g--",
-        label="Ookla DL WLAN",
-        linewidth=2,
-        markersize=12)
+    if (df_iperf_eth[df_iperf_eth["direction"] == "downlink"].shape[0] > 0):
+        ax.plot(
+            df_iperf_eth[
+                df_iperf_eth["direction"] == "downlink"]["timestamp"],
+            df_iperf_eth[
+                df_iperf_eth["direction"] == "downlink"]["tput_mbps"],
+            "b-",
+            label="iperf DL Eth",
+            linewidth=2,
+            markersize=12)
+    if (df_iperf_wlan[df_iperf_wlan["direction"] == "downlink"].shape[0] > 0):
+        ax.plot(
+            df_iperf_wlan[
+                df_iperf_wlan["direction"] == "downlink"]["timestamp"],
+            df_iperf_wlan[
+                df_iperf_wlan["direction"] == "downlink"]["tput_mbps"],
+            "b--",
+            label="iperf DL WLAN",
+            linewidth=2,
+            markersize=12)
+    if (df_speedtest_eth[
+       df_speedtest_eth["direction"] == "downlink"].shape[0] > 0):
+        ax.plot(
+            df_speedtest_eth[
+                df_speedtest_eth["direction"] == "downlink"]["timestamp"],
+            df_speedtest_eth[
+                df_speedtest_eth["direction"] == "downlink"]["tput_mbps"],
+            "g-",
+            label="Ookla DL Eth",
+            linewidth=2,
+            markersize=12)
+    if (df_speedtest_wlan[
+       df_speedtest_wlan["direction"] == "downlink"].shape[0] > 0):
+        ax.plot(
+            df_speedtest_wlan[
+                df_speedtest_wlan["direction"] == "downlink"]["timestamp"],
+            df_speedtest_wlan[
+                df_speedtest_wlan["direction"] == "downlink"]["tput_mbps"],
+            "g--",
+            label="Ookla DL WLAN",
+            linewidth=2,
+            markersize=12)
 
     ax.set_xlabel(r"$\mathbf{Time}$", fontsize=20)
     ax.set_ylabel(r"$\mathbf{Tput (Mbps)}$", fontsize=20)
@@ -106,50 +114,48 @@ for mac in macs:
     # UL
     fig, ax = plt.subplots(figsize=(12, 4))
 
-    ax.plot(
-        df_iperf[
-            (df_iperf["direction"] == "uplink")
-            & (df_iperf["interface"] == "eth0")]["timestamp"],
-        df_iperf[
-            (df_iperf["direction"] == "uplink")
-            & (df_iperf["interface"] == "eth0")]["tput_mbps"],
-        "b-",
-        label="iperf DL Eth",
-        linewidth=2,
-        markersize=12)
-    ax.plot(
-        df_iperf[
-            (df_iperf["direction"] == "uplink")
-            & (df_iperf["interface"] == "wlan0")]["timestamp"],
-        df_iperf[
-            (df_iperf["direction"] == "uplink")
-            & (df_iperf["interface"] == "wlan0")]["tput_mbps"],
-        "b--",
-        label="iperf DL WLAN",
-        linewidth=2,
-        markersize=12)
-    ax.plot(
-        df_speedtest[
-            (df_speedtest["direction"] == "uplink")
-            & (df_speedtest["interface"] == "eth0")]["timestamp"],
-        df_speedtest[
-            (df_speedtest["direction"] == "uplink")
-            & (df_speedtest["interface"] == "eth0")]["tput_mbps"],
-        "g-",
-        label="Ookla DL Eth",
-        linewidth=2,
-        markersize=12)
-    ax.plot(
-        df_speedtest[
-            (df_speedtest["direction"] == "uplink")
-            & (df_speedtest["interface"] == "wlan0")]["timestamp"],
-        df_speedtest[
-            (df_speedtest["direction"] == "uplink")
-            & (df_speedtest["interface"] == "wlan0")]["tput_mbps"],
-        "g--",
-        label="Ookla DL WLAN",
-        linewidth=2,
-        markersize=12)
+    if (df_iperf_eth[df_iperf_eth["direction"] == "uplink"].shape[0] > 0):
+        ax.plot(
+            df_iperf_eth[
+                df_iperf_eth["direction"] == "uplink"]["timestamp"],
+            df_iperf_eth[
+                df_iperf_eth["direction"] == "uplink"]["tput_mbps"],
+            "b-",
+            label="iperf UL Eth",
+            linewidth=2,
+            markersize=12)
+    if (df_iperf_wlan[df_iperf_wlan["direction"] == "uplink"].shape[0] > 0):
+        ax.plot(
+            df_iperf_wlan[
+                df_iperf_wlan["direction"] == "uplink"]["timestamp"],
+            df_iperf_wlan[
+                df_iperf_wlan["direction"] == "uplink"]["tput_mbps"],
+            "b--",
+            label="iperf UL WLAN",
+            linewidth=2,
+            markersize=12)
+    if (df_speedtest_eth[
+       df_speedtest_eth["direction"] == "uplink"].shape[0] > 0):
+        ax.plot(
+            df_speedtest_eth[
+                df_speedtest_eth["direction"] == "uplink"]["timestamp"],
+            df_speedtest_eth[
+                df_speedtest_eth["direction"] == "uplink"]["tput_mbps"],
+            "g-",
+            label="Ookla UL Eth",
+            linewidth=2,
+            markersize=12)
+    if (df_speedtest_wlan[
+       df_speedtest_wlan["direction"] == "uplink"].shape[0] > 0):
+        ax.plot(
+            df_speedtest_wlan[
+                df_speedtest_wlan["direction"] == "uplink"]["timestamp"],
+            df_speedtest_wlan[
+                df_speedtest_wlan["direction"] == "uplink"]["tput_mbps"],
+            "g--",
+            label="Ookla UL WLAN",
+            linewidth=2,
+            markersize=12)
 
     ax.set_xlabel(r"$\mathbf{Time}$", fontsize=20)
     ax.set_ylabel(r"$\mathbf{Tput (Mbps)}$", fontsize=20)
