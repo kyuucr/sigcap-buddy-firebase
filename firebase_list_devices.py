@@ -4,6 +4,7 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db
 import logging
+import sys
 
 cred = credentials.Certificate(
     "nd-schmidt-firebase-adminsdk-d1gei-43db929d8a.json")
@@ -43,16 +44,13 @@ def list_devices(args):
             datetime.fromtimestamp(
                 last_timestamp / 1000).astimezone().isoformat())
 
-    if (args.output_file):
-        with open(args.output_file, "w") as file:
-            file.write(outstring)
-    else:
-        print(outstring)
+    args.output_file.write(outstring)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-o", "--output-file",
+    parser.add_argument("-o", "--output-file", nargs='?',
+                        type=argparse.FileType('w'), default=sys.stdout,
                         help="Output result to file, default is to stdout'")
     parser.add_argument("-l", "--log-level", default="warning",
                         help="Provide logging level, default is warning'")
