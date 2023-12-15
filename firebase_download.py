@@ -16,7 +16,7 @@ firebase_admin.initialize_app(cred, {
 def download(args):
     # Setup
     logging.basicConfig(level=args.log_level.upper())
-    logdir = Path(args.log_dir)
+    logdir = args.log_dir
     logging.debug("logdir=%s", logdir)
 
     bucket = storage.bucket()
@@ -46,7 +46,7 @@ def download(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--log-dir", default="./logs",
+    parser.add_argument("-d", "--log-dir", type=Path, default=Path("./logs"),
                         help="Specify local log directory, default='./logs'")
     parser.add_argument("-l", "--log-level", default="warning",
                         help="Provide logging level, default is warning'")
