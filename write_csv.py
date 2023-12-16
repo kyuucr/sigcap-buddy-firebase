@@ -135,14 +135,17 @@ def write_csv(args):
     for file in files:
         logging.debug("Reading %s", file)
         with open(file) as fd:
+            json_dict = dict()
             try:
+                json_dict = json.load(fd)
+            except Exception as err:
+                logging.debug("Cannot parse file %s as JSON, reason=%s",
+                              file, err)
+            else:
                 outarr += get_line(
                     args.mode,
                     file.parts[1],
-                    json.load(fd))
-            except Exception as err:
-                logging.warning("Cannot parse file %s, reason=%s",
-                                file, err)
+                    json_dict)
 
     if (args.json):
         args.output_file.write(json.dumps(outarr))
