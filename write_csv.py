@@ -1,4 +1,5 @@
 import argparse
+import csv
 from datetime import datetime
 import json
 import logging
@@ -6,102 +7,114 @@ from pathlib import Path
 import sys
 
 
-def get_tput_csv_line(mac, json_dict):
+def get_tput_line(mac, json_dict):
+    outarr = list()
     if ("error" in json_dict):
-        return ""
+        return outarr
 
     if ("start" in json_dict):
         # iperf file
-        outstring = datetime.fromtimestamp(
-            json_dict["start"]["timestamp"]["timesecs"]
-        ).astimezone().isoformat(timespec="seconds") + ","
-        outstring += mac + ","
-        outstring += "iperf,"
-        outstring += ("downlink"
-                      if json_dict["start"]["test_start"]["reverse"] == 1
-                      else "uplink") + ","
-        outstring += (json_dict["start"]["interface"]
-                      if "interface" in json_dict["start"]
-                      else "eth0") + ","
-        outstring += json_dict["start"]["connecting_to"]["host"] + ":"
-        outstring += str(json_dict["start"]["connecting_to"]["port"]) + ","
-        outstring += "NaN,"
-        outstring += str(json_dict["end"]["sum_received"]["seconds"]) + ","
-        outstring += str(json_dict["end"]["sum_received"]["bytes"] / 1e6) + ","
-        outstring += str(
-            json_dict["end"]["sum_received"]["bits_per_second"] / 1e6) + "\n"
-        return outstring
+        outarr.append({
+            "timestamp": datetime.fromtimestamp(
+                json_dict["start"]["timestamp"]["timesecs"]
+            ).astimezone().isoformat(timespec="seconds"),
+            "mac": mac,
+            "type": "iperf",
+            "direction": ("downlink"
+                          if json_dict["start"]["test_start"]["reverse"] == 1
+                          else "uplink"),
+            "interface": (json_dict["start"]["interface"]
+                          if "interface" in json_dict["start"]
+                          else "eth0"),
+            "host": "{}:{}".format(
+                json_dict["start"]["connecting_to"]["host"],
+                str(json_dict["start"]["connecting_to"]["port"])),
+            "isp": "NaN",
+            "duration_s": json_dict["end"]["sum_received"]["seconds"],
+            "transfered_mbytes":
+                json_dict["end"]["sum_received"]["bytes"] / 1e6,
+            "tput_mbps":
+                json_dict["end"]["sum_received"]["bits_per_second"] / 1e6,
+        })
     elif ("type" in json_dict):
         # new speedtest file
         timestamp = datetime.fromisoformat(
             json_dict["timestamp"]).astimezone().isoformat(timespec="seconds")
-        outstring = timestamp + ","
-        outstring += mac + ","
-        outstring += "speedtest,"
-        outstring += "downlink,"
-        outstring += json_dict["interface"]["name"] + ","
-        outstring += json_dict["server"]["host"] + ","
-        outstring += json_dict["isp"] + ","
-        outstring += str(json_dict["download"]["elapsed"] / 1e3) + ","
-        outstring += str(json_dict["download"]["bytes"] / 1e6) + ","
-        outstring += str(json_dict["download"]["bandwidth"] * 8 / 1e6) + "\n"
-        outstring += timestamp + ","
-        outstring += mac + ","
-        outstring += "speedtest,"
-        outstring += "uplink,"
-        outstring += json_dict["interface"]["name"] + ","
-        outstring += json_dict["server"]["host"] + ","
-        outstring += json_dict["isp"] + ","
-        outstring += str(json_dict["upload"]["elapsed"] / 1e3) + ","
-        outstring += str(json_dict["upload"]["bytes"] / 1e6) + ","
-        outstring += str(json_dict["upload"]["bandwidth"] * 8 / 1e6) + "\n"
-        return outstring
+        outarr.append({
+            "timestamp": timestamp,
+            "mac": mac,
+            "type": "speedtest",
+            "direction": "downlink",
+            "interface": json_dict["interface"]["name"],
+            "host": json_dict["server"]["host"],
+            "isp": json_dict["isp"],
+            "duration_s": json_dict["download"]["elapsed"] / 1e3,
+            "transfered_mbytes": json_dict["download"]["bytes"] / 1e6,
+            "tput_mbps": json_dict["download"]["bandwidth"] * 8 / 1e6
+        })
+        outarr.append({
+            "timestamp": timestamp,
+            "mac": mac,
+            "type": "speedtest",
+            "direction": "uplink",
+            "interface": json_dict["interface"]["name"],
+            "host": json_dict["server"]["host"],
+            "isp": json_dict["isp"],
+            "duration_s": json_dict["upload"]["elapsed"] / 1e3,
+            "transfered_mbytes": json_dict["upload"]["bytes"] / 1e6,
+            "tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6
+        })
     elif ("beacons" in json_dict):
-        return ""
+        pass
     else:
         # old speedtest file
         timestamp = datetime.fromisoformat(
             json_dict["timestamp"]).astimezone().isoformat(timespec="seconds")
-        outstring = timestamp + ","
-        outstring += mac + ","
-        outstring += "speedtest,"
-        outstring += "downlink,"
-        outstring += "eth0,"
-        outstring += json_dict["server"]["host"] + ","
-        outstring += json_dict["client"]["isp"] + ","
-        outstring += "NaN,"
-        outstring += str(json_dict["bytes_received"] / 1e6) + ","
-        outstring += str(json_dict["download"] / 1e6) + "\n"
-        outstring += timestamp + ","
-        outstring += mac + ","
-        outstring += "speedtest,"
-        outstring += "uplink,"
-        outstring += "eth0,"
-        outstring += json_dict["server"]["host"] + ","
-        outstring += json_dict["client"]["isp"] + ","
-        outstring += "NaN,"
-        outstring += str(json_dict["bytes_sent"] / 1e6) + ","
-        outstring += str(json_dict["upload"] / 1e6) + "\n"
-        return outstring
+        outarr.append({
+            "timestamp": timestamp,
+            "mac": mac,
+            "type": "speedtest",
+            "direction": "downlink",
+            "interface": "eth0",
+            "host": json_dict["server"]["host"],
+            "isp": json_dict["client"]["isp"],
+            "duration_s": "NaN",
+            "transfered_mbytes": json_dict["bytes_received"] / 1e6,
+            "tput_mbps": json_dict["download"] / 1e6
+        })
+        outarr.append({
+            "timestamp": timestamp,
+            "mac": mac,
+            "type": "speedtest",
+            "direction": "uplink",
+            "interface": "eth0",
+            "host": json_dict["server"]["host"],
+            "isp": json_dict["client"]["isp"],
+            "duration_s": "NaN",
+            "transfered_mbytes": json_dict["bytes_sent"] / 1e6,
+            "tput_mbps": json_dict["upload"] / 1e6
+        })
+
+    return outarr
 
 
-def get_lat_csv_line(mac, json_dict):
-    return ""
+def get_lat_line(mac, json_dict):
+    return list()
 
 
-def get_scan_csv_line(mac, json_dict):
-    return ""
+def get_scan_line(mac, json_dict):
+    return list()
 
 
-def get_csv_line(mode, mac, json_dict):
+def get_line(mode, mac, json_dict):
     logging.debug("mode=%s,mac=%s", mode, mac)
     match mode:
         case "throughput":
-            return get_tput_csv_line(mac, json_dict)
+            return get_tput_line(mac, json_dict)
         case "latency":
-            return get_lat_csv_line(mac, json_dict)
+            return get_lat_line(mac, json_dict)
         case "wifi_scan":
-            return get_scan_csv_line(mac, json_dict)
+            return get_scan_line(mac, json_dict)
 
 
 def write_csv(args):
@@ -117,23 +130,13 @@ def write_csv(args):
         files = [path for path in args.log_dir.rglob("*") if path.is_file()]
     logging.debug(files)
 
-    outstring = ""
-    match args.mode:
-        case "throughput":
-            outstring += ("timestamp,mac,type,direction,interface,host,isp,"
-                          "duration_s,transfered_mbytes,tput_mbps\n")
-        case "latency":
-            outstring += ("timestamp,mac,type,interface,host,isp,"
-                          "latency_ms,jitter_ms\n")
-        case "wifi_scan":
-            outstring += ("timestamp,mac,bssid,ssid,rssi,primary_channel,"
-                          "primary_freq\n")
+    outarr = list()
 
     for file in files:
         logging.debug("Reading %s", file)
         with open(file) as fd:
             try:
-                outstring += get_csv_line(
+                outarr += get_line(
                     args.mode,
                     file.parts[1],
                     json.load(fd))
@@ -141,7 +144,28 @@ def write_csv(args):
                 logging.warning("Cannot parse file %s, reason=%s",
                                 file, err)
 
-    args.output_file.write(outstring)
+    if (args.json):
+        args.output_file.write(json.dumps(outarr))
+    else:
+        fieldnames = []
+        match args.mode:
+            case "throughput":
+                fieldnames += ["timestamp", "mac", "type", "direction",
+                               "interface", "host", "isp", "duration_s",
+                               "transfered_mbytes", "tput_mbps"]
+            case "latency":
+                fieldnames += ["timestamp", "mac", "type", "interface",
+                               "host", "isp", "latency_ms", "jitter_ms"]
+            case "wifi_scan":
+                fieldnames += ["timestamp", "mac", "bssid", "ssid", "rssi",
+                               "primary_channel_num", "primary_freq",
+                               "channel_num", "center_freq0", "center_freq1"
+                               "bandwidth", "amendment"]
+
+        csv_writer = csv.DictWriter(
+            args.output_file, fieldnames=fieldnames)
+        csv_writer.writeheader()
+        csv_writer.writerows(outarr)
     print("Done!")
 
 
@@ -149,6 +173,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", choices=["throughput", "latency", "wifi_scan"],
                         help="Choose type of CSV files.'")
+    parser.add_argument("-J", "--json", action="store_true",
+                        help="Output as JSON.")
     parser.add_argument("-m", "--mac", nargs='+',
                         help="Filter data to the speficied MAC address'")
     parser.add_argument("-o", "--output-file", nargs='?',
