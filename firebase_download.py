@@ -6,12 +6,6 @@ from google.cloud.storage import transfer_manager
 import logging
 from pathlib import Path
 
-cred = credentials.Certificate(
-    "nd-schmidt-firebase-adminsdk-d1gei-43db929d8a.json")
-firebase_admin.initialize_app(cred, {
-    "storageBucket": "nd-schmidt.appspot.com"
-})
-
 
 def download(args):
     # Setup
@@ -44,12 +38,22 @@ def download(args):
             print("Downloaded %s from %s." % (name, bucket.name))
 
 
-if __name__ == '__main__':
+def parse(list_args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--log-dir", type=Path, default=Path("./logs"),
                         help="Specify local log directory, default='./logs'")
     parser.add_argument("-l", "--log-level", default="warning",
                         help="Provide logging level, default is warning'")
-    args = parser.parse_args()
+    if (list_args is None):
+        return parser.parse_args()
+    else:
+        return parser.parse_args(args=list_args)
 
-    download(args)
+
+if __name__ == '__main__':
+    cred = credentials.Certificate(
+        "nd-schmidt-firebase-adminsdk-d1gei-43db929d8a.json")
+    firebase_admin.initialize_app(cred, {
+        "storageBucket": "nd-schmidt.appspot.com"
+    })
+    download(parse())
