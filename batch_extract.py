@@ -1,6 +1,7 @@
 import argparse
 import logging
 from pathlib import Path
+import subprocess
 import firebase_admin
 from firebase_admin import credentials
 import firebase_download
@@ -15,7 +16,11 @@ def batch_extract(args):
     # 1. Download logs
     firebase_download.download(args)
     # 1.1. Zip all logs
-    # TODO
+    cmd_out = subprocess.check_output(
+        ["zip", "-r",
+         str(args.outdir.joinpath("all_raw_logs.zip").resolve()),
+         "."], cwd=str(args.log_dir.resolve())).decode("utf-8")
+    logging.debug(cmd_out)
 
     # 2. Download device states
     list_devices = firebase_list_devices.list_devices()
