@@ -99,7 +99,67 @@ def get_tput_line(mac, json_dict):
 
 
 def get_lat_line(mac, json_dict):
-    return list()
+    outarr = list()
+    if ("error" in json_dict):
+        return outarr
+
+    if ("start" in json_dict):
+        # iperf file
+        pass
+    elif ("type" in json_dict):
+        # new speedtest file
+        timestamp = datetime.fromisoformat(
+            json_dict["timestamp"]).astimezone().isoformat(timespec="seconds")
+        outarr.append({
+            "timestamp": timestamp,
+            "mac": mac,
+            "type": "speedtest_idle",
+            "interface": json_dict["interface"]["name"],
+            "host": json_dict["server"]["host"],
+            "isp": json_dict["isp"],
+            "latency_ms": json_dict["ping"]["latency"],
+            "jitter_ms": json_dict["ping"]["jitter"]
+        })
+        if ("latency" in json_dict["download"]):
+            outarr.append({
+                "timestamp": timestamp,
+                "mac": mac,
+                "type": "speedtest_dl_load",
+                "interface": json_dict["interface"]["name"],
+                "host": json_dict["server"]["host"],
+                "isp": json_dict["isp"],
+                "latency_ms": json_dict["download"]["latency"]["iqm"],
+                "jitter_ms": json_dict["download"]["latency"]["jitter"]
+            })
+        if ("latency" in json_dict["upload"]):
+            outarr.append({
+                "timestamp": timestamp,
+                "mac": mac,
+                "type": "speedtest_ul_load",
+                "interface": json_dict["interface"]["name"],
+                "host": json_dict["server"]["host"],
+                "isp": json_dict["isp"],
+                "latency_ms": json_dict["upload"]["latency"]["iqm"],
+                "jitter_ms": json_dict["upload"]["latency"]["jitter"]
+            })
+    elif ("beacons" in json_dict):
+        pass
+    else:
+        # old speedtest file
+        timestamp = datetime.fromisoformat(
+            json_dict["timestamp"]).astimezone().isoformat(timespec="seconds")
+        outarr.append({
+            "timestamp": timestamp,
+            "mac": mac,
+            "type": "speedtest_idle",
+            "interface": "eth0",
+            "host": json_dict["server"]["host"],
+            "isp": json_dict["client"]["isp"],
+            "latency_ms": json_dict["ping"],
+            "jitter_ms": "NaN"
+        })
+
+    return outarr
 
 
 def get_scan_line(mac, json_dict):
