@@ -6,7 +6,7 @@ import firebase_admin
 from firebase_admin import credentials
 import firebase_download
 import firebase_list_devices
-# import write_csv
+import write_csv
 
 
 def batch_extract(args):
@@ -18,7 +18,7 @@ def batch_extract(args):
     # 1.1. Zip all logs
     cmd_out = subprocess.check_output(
         ["zip", "-r",
-         str(args.outdir.joinpath("all_raw_logs.zip").resolve()),
+         str(args.outdir.joinpath("all_rawlogs.zip").resolve()),
          "."], cwd=str(args.log_dir.resolve())).decode("utf-8")
     logging.debug(cmd_out)
 
@@ -40,20 +40,73 @@ def batch_extract(args):
              "-l", args.log_level]))
 
     # 3. Write CSV and JSON for each mac
-    # for mac in macs:
-    #     # Write as JSON
-    #     write_csv.write("throuhgput", args=mac)
-    #     write_csv.write("latency", args=mac)
-    #     # Write as CSV
-    #     write_csv.write("throuhgput", args=mac)
-    #     write_csv.write("latency", args=mac)
-    #     # Zip CSVs
-    #     # TODO
-    #     # Zip raw log
-    #     # TODO
+    for mac in macs:
+        out_tput = write_csv.read_logs(write_csv.parse(
+            ["throughput",
+             "-d", str(args.log_dir),
+             "-m", mac,
+             "-l", args.log_level]))
+        out_lat = write_csv.read_logs(write_csv.parse(
+            ["latency",
+             "-d", str(args.log_dir),
+             "-m", mac,
+             "-l", args.log_level]))
+
+        # 3.1. Write tput
+        if (len(out_tput) > 0):
+            write_csv.write(out_tput, write_csv.parse(
+                ["throughput", "-J",
+                 "-o", str(args.outdir.joinpath(
+                           "throughput_{}.json".format(mac))),
+                 "-l", args.log_level]))
+            write_csv.write(out_tput, write_csv.parse(
+                ["throughput",
+                 "-o", str(args.outdir.joinpath(
+                           "throughput_{}.csv".format(mac))),
+                 "-l", args.log_level]))
+
+        # 3.2. Write lat
+        if (len(out_lat) > 0):
+            write_csv.write(out_lat, write_csv.parse(
+                ["latency", "-J",
+                 "-o", str(args.outdir.joinpath(
+                           "latency_{}.json".format(mac))),
+                 "-l", args.log_level]))
+            write_csv.write(out_lat, write_csv.parse(
+                ["latency",
+                 "-o", str(args.outdir.joinpath(
+                           "latency_{}.csv".format(mac))),
+                 "-l", args.log_level]))
+
+        # 3.3. Zip CSVs & JSONs
+        if (len(out_tput) > 0 or len(out_lat) > 0):
+            cmd_out = subprocess.check_output(
+                ["zip", "-r",
+                 str(args.outdir.joinpath(
+                     "data_{}.zip".format(mac)).resolve()),
+                 ".", "-i",
+                 "*_{}.json".format(mac),
+                 "*_{}.csv".format(mac)],
+                cwd=str(args.outdir.resolve())).decode("utf-8")
+            logging.debug(cmd_out)
+
+        # 3.4. Zip raw logs
+        if (args.log_dir.joinpath(mac).is_dir()):
+            cmd_out = subprocess.check_output(
+                ["zip", "-r",
+                 str(args.outdir.joinpath(
+                     "rawlogs_{}.zip".format(mac)).resolve()),
+                 "."],
+                cwd=str(args.log_dir.joinpath(mac).resolve())).decode("utf-8")
+            logging.debug(cmd_out)
 
     # 4. Zip all CSVs
-    # TODO
+    cmd_out = subprocess.check_output(
+        ["zip", "-r",
+         str(args.outdir.joinpath("all_data.zip").resolve()),
+         ".", "-i", "*.json", "*.csv"],
+        cwd=str(args.outdir.resolve())).decode("utf-8")
+    logging.debug(cmd_out)
 
     print("Done!")
 

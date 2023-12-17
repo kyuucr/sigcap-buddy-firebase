@@ -177,9 +177,32 @@ def get_line(mode, mac, json_dict):
             return get_scan_line(mac, json_dict)
 
 
-def write_csv(args):
-    # Setup
-    logging.basicConfig(level=args.log_level.upper())
+def write(outarr, args):
+    if (args.json):
+        args.output_file.write(json.dumps(outarr))
+    else:
+        fieldnames = []
+        match args.mode:
+            case "throughput":
+                fieldnames += ["timestamp", "mac", "type", "direction",
+                               "interface", "host", "isp", "duration_s",
+                               "transfered_mbytes", "tput_mbps"]
+            case "latency":
+                fieldnames += ["timestamp", "mac", "type", "interface",
+                               "host", "isp", "latency_ms", "jitter_ms"]
+            case "wifi_scan":
+                fieldnames += ["timestamp", "mac", "bssid", "ssid", "rssi",
+                               "primary_channel_num", "primary_freq",
+                               "channel_num", "center_freq0", "center_freq1"
+                               "bandwidth", "amendment"]
+
+        csv_writer = csv.DictWriter(
+            args.output_file, fieldnames=fieldnames)
+        csv_writer.writeheader()
+        csv_writer.writerows(outarr)
+
+
+def read_logs(args):
     if (args.mac):
         logging.debug(args.mac)
         files = []
@@ -207,32 +230,10 @@ def write_csv(args):
                     file.parts[1],
                     json_dict)
 
-    if (args.json):
-        args.output_file.write(json.dumps(outarr))
-    else:
-        fieldnames = []
-        match args.mode:
-            case "throughput":
-                fieldnames += ["timestamp", "mac", "type", "direction",
-                               "interface", "host", "isp", "duration_s",
-                               "transfered_mbytes", "tput_mbps"]
-            case "latency":
-                fieldnames += ["timestamp", "mac", "type", "interface",
-                               "host", "isp", "latency_ms", "jitter_ms"]
-            case "wifi_scan":
-                fieldnames += ["timestamp", "mac", "bssid", "ssid", "rssi",
-                               "primary_channel_num", "primary_freq",
-                               "channel_num", "center_freq0", "center_freq1"
-                               "bandwidth", "amendment"]
-
-        csv_writer = csv.DictWriter(
-            args.output_file, fieldnames=fieldnames)
-        csv_writer.writeheader()
-        csv_writer.writerows(outarr)
-    print("Done!")
+    return outarr
 
 
-if __name__ == '__main__':
+def parse(list_args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", choices=["throughput", "latency", "wifi_scan"],
                         help="Choose type of CSV files.'")
@@ -247,6 +248,17 @@ if __name__ == '__main__':
                         help="Specify local log directory, default='./logs'")
     parser.add_argument("-l", "--log-level", default="warning",
                         help="Provide logging level, default is warning'")
-    args = parser.parse_args()
+    if (list_args is None):
+        return parser.parse_args()
+    else:
+        return parser.parse_args(args=list_args)
 
-    write_csv(args)
+
+if __name__ == '__main__':
+    # Setup
+    args = parse()
+    logging.basicConfig(level=args.log_level.upper())
+
+    outarr = read_logs(args)
+    write(outarr, args)
+    print("Done!")
