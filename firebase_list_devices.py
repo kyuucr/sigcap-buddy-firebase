@@ -44,7 +44,7 @@ def list_devices():
         last_timestamp = get_last_timestamp(heartbeats, mac)
         outarr.append({
             "mac": mac,
-            "online": (now_timestamp - last_timestamp) < 3600000,  # 1 hour
+            "online": (now_timestamp - last_timestamp) < 3720000,  # 1h 2m
             "last_timestamp": datetime.fromtimestamp(
                 last_timestamp / 1000).astimezone().isoformat()
         })
