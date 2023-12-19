@@ -5,6 +5,7 @@ import json
 import logging
 from pathlib import Path
 import sys
+import wifi_helper
 
 
 def get_tput_line(mac, json_dict):
@@ -29,7 +30,7 @@ def get_tput_line(mac, json_dict):
             "host": "{}:{}".format(
                 json_dict["start"]["connecting_to"]["host"],
                 str(json_dict["start"]["connecting_to"]["port"])),
-            "isp": "NaN",
+            "isp": "unknown",
             "duration_s": json_dict["end"]["sum_received"]["seconds"],
             "transfered_mbytes":
                 json_dict["end"]["sum_received"]["bytes"] / 1e6,
@@ -95,6 +96,7 @@ def get_tput_line(mac, json_dict):
             "tput_mbps": json_dict["upload"] / 1e6
         })
 
+    logging.debug(outarr)
     return outarr
 
 
@@ -159,15 +161,180 @@ def get_lat_line(mac, json_dict):
             "jitter_ms": "NaN"
         })
 
+    logging.debug(outarr)
     return outarr
 
 
 def get_scan_line(mac, json_dict):
-    return list()
+    outlist = list()
+    if ("beacons" not in json_dict):
+        return outlist
+
+    timestamp = datetime.fromisoformat(
+        json_dict["timestamp"]).astimezone().isoformat(timespec="seconds")
+    for beacon in json_dict["beacons"]:
+        primary_ch = int(beacon["channel"])
+        primary_freq = int(float(
+            beacon["freq"][:len(beacon["freq"]) - 4]) * 1000)
+        outtemp = {
+            "timestamp": timestamp,
+            "mac": mac,
+            "bssid": beacon["bssid"],
+            "ssid": beacon["ssid"],
+            "rssi": beacon["rssi"],
+            "primary_channel_num": primary_ch,
+            "primary_freq_mhz": primary_freq,
+            "channel_num": primary_ch,
+            "center_freq0_mhz": primary_freq,
+            "center_freq1_mhz": 0,
+            "bw_mhz": 0,
+            "amendment": "unknown",
+            "tx_power_dbm": "NaN",
+            "link_margin_db": "NaN",
+            "sta_count": "NaN",
+            "ch_utilization": "NaN",
+            "available_admission_capacity_sec": "NaN"
+        }
+
+        he_element = [x for x in beacon["extras"]
+                      if x["type"] == "HE Operation"]
+        if (len(he_element) > 0):
+            he_element = he_element[0]["elements"]
+            logging.debug(he_element)
+
+            outtemp["amendment"] = "11ax"
+
+        vht_element = [x for x in beacon["extras"]
+                       if x["type"] == "VHT Operation"]
+        if (len(vht_element) > 0):
+            vht_element = vht_element[0]["elements"]
+            logging.debug(vht_element)
+
+            if (outtemp["amendment"] == "unknown"):
+                outtemp["amendment"] = "11ac"
+
+            # Resolve bandwidth
+            match vht_element["channel_width"]:
+                case 0:
+                    # 20 or 40 MHz
+                    freq_bw0 = wifi_helper.get_channel_from_num(
+                        wifi_helper.get_freq_code(primary_freq),
+                        vht_element["channel_center_freq_0"])
+
+                    # This will resolve the channel bw
+                    if (freq_bw0 is not None):
+                        outtemp["channel_num"] = freq_bw0[0]
+                        outtemp["center_freq0_mhz"] = freq_bw0[1]
+                        outtemp["bw_mhz"] = freq_bw0[4]
+                    else:
+                        # If channel number not found, this must be 20 Mhz
+                        outtemp["bw_mhz"] = 20
+                case 1:
+                    # 80 or 160 or 80+80 MHz
+                    freq_bw0 = wifi_helper.get_channel_from_num(
+                        wifi_helper.get_freq_code(primary_freq),
+                        vht_element["channel_center_freq_0"])
+                    freq_bw1 = wifi_helper.get_channel_from_num(
+                        wifi_helper.get_freq_code(primary_freq),
+                        vht_element["channel_center_freq_1"])
+
+                    if (freq_bw0 is not None and freq_bw1 is not None):
+                        # This might be 160 or 80+80 MHz
+                        outtemp["bw_mhz"] = 160
+                        outtemp["center_freq0_mhz"] = freq_bw0[1]
+                        outtemp["center_freq1_mhz"] = freq_bw1[1]
+                        if (freq_bw1[4] == 80):
+                            # Must be 80+80 MHz
+                            # Use the first channel segment number,
+                            # may change later
+                            outtemp["channel_num"] = freq_bw0[0]
+                        elif (freq_bw1[4] == 160):
+                            # Must be 160 MHz
+                            # Use the second channel segment number
+                            outtemp["channel_num"] = freq_bw1[0]
+                    elif (freq_bw0 is not None):
+                        # This must be 80 MHz
+                        outtemp["channel_num"] = freq_bw0[0]
+                        outtemp["center_freq0_mhz"] = freq_bw0[1]
+                        outtemp["bw_mhz"] = freq_bw0[4]
+                case 2:
+                    # 160 MHz (deprecated)
+                    freq_bw0 = wifi_helper.get_channel_from_num(
+                        wifi_helper.get_freq_code(primary_freq),
+                        vht_element["channel_center_freq_0"])
+                    if (freq_bw0 is not None):
+                        outtemp["channel_num"] = freq_bw0[0]
+                        outtemp["center_freq0_mhz"] = freq_bw0[1]
+                        outtemp["bw_mhz"] = freq_bw0[4]
+                case 3:
+                    # 80+80 MHz (deprecated)
+                    outtemp["bw_mhz"] = 160
+                    freq_bw0 = wifi_helper.get_channel_from_num(
+                        wifi_helper.get_freq_code(primary_freq),
+                        vht_element["channel_center_freq_0"])
+                    freq_bw1 = wifi_helper.get_channel_from_num(
+                        wifi_helper.get_freq_code(primary_freq),
+                        vht_element["channel_center_freq_1"])
+
+                    # Check the second channel segment first
+                    if (freq_bw1 is not None):
+                        outtemp["center_freq1_mhz"] = freq_bw1[1]
+                        outtemp["channel_num"] = freq_bw1[0]
+                    if (freq_bw0 is not None):
+                        outtemp["center_freq0_mhz"] = freq_bw0[1]
+                        outtemp["channel_num"] = freq_bw0[0]
+
+        ht_element = [x for x in beacon["extras"]
+                      if x["type"] == "HT Operation"]
+        if (len(ht_element) > 0):
+            ht_element = ht_element[0]["elements"]
+            logging.debug(ht_element)
+
+            if (outtemp["amendment"] == "unknown"):
+                outtemp["amendment"] = "11n"
+
+            # Resolve bandwidth if it hasn't been resolved yet
+            if (outtemp["bw_mhz"] == 0):
+                outtemp["bw_mhz"] = 20
+                if (ht_element["sta_channel_width"] == 1):
+                    ch = wifi_helper.get_channel_from_freq(
+                        primary_freq, 40)
+                    if (ch is not None):
+                        outtemp["channel_num"] = ch[0]
+                        outtemp["center_freq0_mhz"] = ch[1]
+                        outtemp["bw_mhz"] = 40
+
+        tpc_element = [x for x in beacon["extras"]
+                       if x["type"] == "TPC Report"]
+        if (len(tpc_element) > 0):
+            tpc_element = tpc_element[0]["elements"]
+            logging.debug(tpc_element)
+
+            outtemp["tx_power_dbm"] = tpc_element["tx_power"]
+            outtemp["link_margin_db"] = tpc_element["link_margin"]
+
+        bss_load_element = [x for x in beacon["extras"]
+                            if x["type"] == "BSS Load"]
+        if (len(bss_load_element) > 0):
+            bss_load_element = bss_load_element[0]["elements"]
+            logging.debug(bss_load_element)
+
+            outtemp["sta_count"] = bss_load_element["sta_count"]
+            outtemp["ch_utilization"] = bss_load_element["ch_utilization"]
+            if ("available_admission_cap" in bss_load_element):
+                outtemp["available_admission_capacity_sec"] = bss_load_element[
+                    "available_admission_cap"] * 32 / 1e6
+
+        logging.debug(outtemp)
+        # Only add to list if we got bandwidth resolved
+        if (outtemp["bw_mhz"] != 0):
+            outlist.append(outtemp)
+
+    return outlist
 
 
 def get_line(mode, mac, json_dict):
-    logging.debug("mode=%s,mac=%s", mode, mac)
+    logging.info("mode=%s,mac=%s", mode, mac)
     match mode:
         case "throughput":
             return get_tput_line(mac, json_dict)
@@ -192,9 +359,12 @@ def write(outarr, args):
                                "host", "isp", "latency_ms", "jitter_ms"]
             case "wifi_scan":
                 fieldnames += ["timestamp", "mac", "bssid", "ssid", "rssi",
-                               "primary_channel_num", "primary_freq",
-                               "channel_num", "center_freq0", "center_freq1"
-                               "bandwidth", "amendment"]
+                               "primary_channel_num", "primary_freq_mhz",
+                               "channel_num", "center_freq0_mhz",
+                               "center_freq1_mhz", "bw_mhz", "amendment",
+                               "tx_power_dbm", "link_margin_db", "sta_count",
+                               "ch_utilization",
+                               "available_admission_capacity_sec"]
 
         csv_writer = csv.DictWriter(
             args.output_file, fieldnames=fieldnames)
@@ -204,19 +374,19 @@ def write(outarr, args):
 
 def read_logs(args):
     if (args.mac):
-        logging.debug(args.mac)
+        logging.info(args.mac)
         files = []
         for mac in args.mac:
             currdir = args.log_dir.joinpath(mac)
             files += [path for path in currdir.rglob("*") if path.is_file()]
     else:
         files = [path for path in args.log_dir.rglob("*") if path.is_file()]
-    logging.debug(files)
+    logging.info(files)
 
     outarr = list()
 
     for file in files:
-        logging.debug("Reading %s", file)
+        logging.info("Reading %s", file)
         with open(file) as fd:
             json_dict = dict()
             try:
