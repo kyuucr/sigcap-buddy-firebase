@@ -25,7 +25,7 @@ def batch_extract(args):
     # 2. Download device states
     list_devices = firebase_list_devices.list_devices()
     macs = [entry["mac"] for entry in list_devices]
-    logging.debug(macs)
+    logging.info(macs)
     # 2.1 Write as JSON
     firebase_list_devices.write(
         list_devices,
@@ -48,6 +48,11 @@ def batch_extract(args):
              "-l", args.log_level]))
         out_lat = write_csv.read_logs(write_csv.parse(
             ["latency",
+             "-d", str(args.log_dir),
+             "-m", mac,
+             "-l", args.log_level]))
+        out_scan = write_csv.read_logs(write_csv.parse(
+            ["wifi_scan",
              "-d", str(args.log_dir),
              "-m", mac,
              "-l", args.log_level]))
@@ -78,7 +83,20 @@ def batch_extract(args):
                            "latency_{}.csv".format(mac))),
                  "-l", args.log_level]))
 
-        # 3.3. Zip CSVs & JSONs
+        # 3.3. Write wifi_scan
+        if (len(out_scan) > 0):
+            write_csv.write(out_scan, write_csv.parse(
+                ["wifi_scan", "-J",
+                 "-o", str(args.outdir.joinpath(
+                           "wifi_scan_{}.json".format(mac))),
+                 "-l", args.log_level]))
+            write_csv.write(out_scan, write_csv.parse(
+                ["wifi_scan",
+                 "-o", str(args.outdir.joinpath(
+                           "wifi_scan_{}.csv".format(mac))),
+                 "-l", args.log_level]))
+
+        # 3.4. Zip CSVs & JSONs
         if (len(out_tput) > 0 or len(out_lat) > 0):
             cmd_out = subprocess.check_output(
                 ["zip", "-r",
@@ -90,7 +108,7 @@ def batch_extract(args):
                 cwd=str(args.outdir.resolve())).decode("utf-8")
             logging.debug(cmd_out)
 
-        # 3.4. Zip raw logs
+        # 3.5. Zip raw logs
         if (args.log_dir.joinpath(mac).is_dir()):
             cmd_out = subprocess.check_output(
                 ["zip", "-r",
@@ -100,7 +118,7 @@ def batch_extract(args):
                 cwd=str(args.log_dir.joinpath(mac).resolve())).decode("utf-8")
             logging.debug(cmd_out)
 
-    # 4. Zip all CSVs
+    # 4. Zip all CSVs & JSONs
     cmd_out = subprocess.check_output(
         ["zip", "-r",
          str(args.outdir.joinpath("all_data.zip").resolve()),
