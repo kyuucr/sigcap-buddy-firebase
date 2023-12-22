@@ -181,7 +181,7 @@ def get_scan_line(mac, json_dict):
             "mac": mac,
             "bssid": beacon["bssid"],
             "ssid": beacon["ssid"],
-            "rssi": beacon["rssi"],
+            "rssi_dbm": int(beacon["rssi"][:(len(beacon["rssi"]) - 4)]),
             "primary_channel_num": primary_ch,
             "primary_freq_mhz": primary_freq,
             "channel_num": primary_ch,
@@ -360,7 +360,7 @@ def write(outarr, args):
                 fieldnames += ["timestamp", "mac", "type", "interface",
                                "host", "isp", "latency_ms", "jitter_ms"]
             case "wifi_scan":
-                fieldnames += ["timestamp", "mac", "bssid", "ssid", "rssi",
+                fieldnames += ["timestamp", "mac", "bssid", "ssid", "rssi_dbm",
                                "primary_channel_num", "primary_freq_mhz",
                                "channel_num", "center_freq0_mhz",
                                "center_freq1_mhz", "bw_mhz", "amendment",
