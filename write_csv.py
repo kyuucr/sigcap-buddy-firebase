@@ -189,6 +189,8 @@ def get_scan_line(mac, json_dict):
             "center_freq1_mhz": 0,
             "bw_mhz": 0,
             "amendment": "unknown",
+            "connected": "unknown" if "connected" not in beacon
+            else beacon["connected"],
             "tx_power_dbm": "NaN",
             "link_margin_db": "NaN",
             "sta_count": "NaN",
@@ -362,8 +364,8 @@ def write(outarr, args):
                                "primary_channel_num", "primary_freq_mhz",
                                "channel_num", "center_freq0_mhz",
                                "center_freq1_mhz", "bw_mhz", "amendment",
-                               "tx_power_dbm", "link_margin_db", "sta_count",
-                               "ch_utilization",
+                               "connected", "tx_power_dbm", "link_margin_db",
+                               "sta_count", "ch_utilization",
                                "available_admission_capacity_sec"]
 
         csv_writer = csv.DictWriter(
