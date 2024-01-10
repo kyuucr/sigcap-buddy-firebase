@@ -24,36 +24,53 @@ def write(outarr, args):
         args.output_file.write(json.dumps(outarr))
     else:
         csv_writer = csv.DictWriter(
-            args.output_file, fieldnames=["mac", "online", "last_timestamp"])
+            args.output_file,
+            fieldnames=["mac", "online", "last_timestamp"]
+            if (args.mac == "disabled") else ["mac", "last_timestamp"])
         csv_writer.writeheader()
         csv_writer.writerows(outarr)
 
 
-def list_devices():
+def list_devices(mac_output="disabled"):
     heartbeats = db.reference("heartbeat").order_by_child(
         "last_timestamp").get().values()
 
-    macs = list(dict.fromkeys(
-        [val["mac"].replace(":", "-") for val in heartbeats]))
-    logging.debug(macs)
+    if (mac_output == "disabled"):
+        macs = list(dict.fromkeys(
+            [val["mac"].replace(":", "-") for val in heartbeats]))
+        logging.debug(macs)
 
-    outarr = list()
-    now_timestamp = datetime.timestamp(datetime.now()) * 1000
+        outarr = list()
+        now_timestamp = datetime.timestamp(datetime.now()) * 1000
 
-    for mac in macs:
-        last_timestamp = get_last_timestamp(heartbeats, mac)
-        outarr.append({
-            "mac": mac,
-            "online": (now_timestamp - last_timestamp) < 3720000,  # 1h 2m
+        for mac in macs:
+            last_timestamp = get_last_timestamp(heartbeats, mac)
+            outarr.append({
+                "mac": mac,
+                "online": (now_timestamp - last_timestamp) < 3720000,  # 1h 2m
+                "last_timestamp": datetime.fromtimestamp(
+                    last_timestamp / 1000).astimezone().isoformat()
+            })
+
+        return sorted(outarr, key=lambda x: (~x["online"], x["mac"]))
+
+    else:
+        outarr = list(map(lambda x: {
+            "mac": x["mac"],
             "last_timestamp": datetime.fromtimestamp(
-                last_timestamp / 1000).astimezone().isoformat()
-        })
-
-    return sorted(outarr, key=lambda x: (~x["online"], x["mac"]))
+                x["last_timestamp"] / 1000).astimezone().isoformat()
+        }, heartbeats))
+        if (mac_output is not None):
+            outarr = list(filter(
+                lambda x: x["mac"].replace(":", "-") == mac_output,
+                outarr))
+        return outarr
 
 
 def parse(list_args=None):
     parser = argparse.ArgumentParser()
+    parser.add_argument("-m", "--mac", nargs='?', default="disabled",
+                        help="Output heartbeats for all or a specified MAC'")
     parser.add_argument("-J", "--json", action="store_true",
                         help="Output as JSON.")
     parser.add_argument("-o", "--output-file", nargs='?',
@@ -78,7 +95,7 @@ if __name__ == '__main__':
     })
 
     # List devices and write output
-    outarr = list_devices()
+    outarr = list_devices(args.mac)
     logging.debug(outarr)
     write(outarr, args)
     print("Done!")
