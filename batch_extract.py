@@ -56,6 +56,7 @@ def batch_extract(args):
              "-d", str(args.log_dir),
              "-m", mac,
              "-l", args.log_level]))
+        out_hbeat = firebase_list_devices.list_devices(mac)
 
         # 3.1. Write tput
         if (len(out_tput) > 0):
@@ -96,7 +97,22 @@ def batch_extract(args):
                            "wifi_scan_{}.csv".format(mac))),
                  "-l", args.log_level]))
 
-        # 3.4. Zip CSVs & JSONs
+        # 3.4. Write heartbeats
+        if (len(out_hbeat) > 0):
+            firebase_list_devices.write(
+                out_hbeat,
+                firebase_list_devices.parse(
+                    ["-J", "-m", mac, "-o", str(args.outdir.joinpath(
+                        "heartbeat_{}.json".format(mac))),
+                     "-l", args.log_level]))
+            firebase_list_devices.write(
+                out_hbeat,
+                firebase_list_devices.parse(
+                    ["-m", mac, "-o", str(args.outdir.joinpath(
+                        "heartbeat_{}.csv".format(mac))),
+                     "-l", args.log_level]))
+
+        # 3.5. Zip CSVs & JSONs
         if (len(out_tput) > 0 or len(out_lat) > 0):
             cmd_out = subprocess.check_output(
                 ["zip", "-r",
@@ -108,7 +124,7 @@ def batch_extract(args):
                 cwd=str(args.outdir.resolve())).decode("utf-8")
             logging.debug(cmd_out)
 
-        # 3.5. Zip raw logs
+        # 3.6. Zip raw logs
         if (args.log_dir.joinpath(mac).is_dir()):
             cmd_out = subprocess.check_output(
                 ["zip", "-r",
