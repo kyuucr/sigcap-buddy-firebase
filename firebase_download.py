@@ -17,8 +17,10 @@ def download(args):
 
     # List files to download
     all_files = [file.name for file in bucket.list_blobs()]
-    to_download = list(filter(lambda x: not logdir.joinpath(x).exists(),
-                              all_files))
+    to_download = list(filter(
+        lambda x: not logdir.joinpath(x).exists()
+        or "speedtest_logger.log" in x,
+        all_files))
     print("Found %d files to download" % len(to_download))
     logging.debug(to_download)
 
