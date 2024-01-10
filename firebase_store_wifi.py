@@ -14,7 +14,7 @@ firebase_admin.initialize_app(cred, {
 
 def main():
     def_mac = ":".join(("%012X" % get_mac())[i:i + 2] for i in range(0, 12, 2))
-    parser = ArgumentParser(prog="store_wifi.py",
+    parser = ArgumentParser(prog="firebase_store_wifi.py",
                             description="Store Wi-Fi info to Firebase DB")
     parser.add_argument("--mac", type=str, help="Input MAC")
     parser.add_argument("--ssid", type=str, help="Input SSID")
