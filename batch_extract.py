@@ -15,16 +15,15 @@ def batch_extract(args):
     # Setup
     logging.basicConfig(level=args.log_level.upper())
 
-    # 1. Download logs
+    print("1. Download and zip all logs")
     firebase_download.download(args)
-    # 1.1. Zip all logs
     cmd_out = subprocess.check_output(
         ["zip", "-r",
          str(args.outdir.joinpath("all_rawlogs.zip").resolve()),
          "."], cwd=str(args.log_dir.resolve())).decode("utf-8")
     logging.debug(cmd_out)
 
-    # 2. Download device states
+    print("2. Download and write device states")
     list_devices = firebase_list_devices.list_devices()
     macs = [entry["mac"] for entry in list_devices]
     logging.info(macs)
@@ -41,7 +40,7 @@ def batch_extract(args):
             ["-o", str(args.outdir.joinpath("device_list.csv")),
              "-l", args.log_level]))
 
-    # 3. Write CSV and JSON for each mac
+    print("3. Write CSV and JSON for each MAC")
     for mac in macs:
         out_tput = write_csv.read_logs(write_csv.parse(
             ["throughput",
@@ -136,7 +135,7 @@ def batch_extract(args):
                 cwd=str(args.log_dir.joinpath(mac).resolve())).decode("utf-8")
             logging.debug(cmd_out)
 
-    # 4. Zip all CSVs & JSONs
+    print("4. Zip all CSVs & JSONs")
     cmd_out = subprocess.check_output(
         ["zip", "-r",
          str(args.outdir.joinpath("all_data.zip").resolve()),
@@ -144,7 +143,7 @@ def batch_extract(args):
         cwd=str(args.outdir.resolve())).decode("utf-8")
     logging.debug(cmd_out)
 
-    # 5. Write last update JSON
+    print("5. Write last update JSON")
     with open(args.outdir.joinpath("last_update.json"), "w") as fd:
         fd.write(json.dumps({
             "last_update": datetime.now().astimezone().isoformat(
