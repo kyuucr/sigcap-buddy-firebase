@@ -26,7 +26,7 @@ def write(outarr, args):
         csv_writer = csv.DictWriter(
             args.output_file,
             fieldnames=["mac", "online", "last_timestamp"]
-            if (args.mac == "disabled") else ["mac", "last_timestamp"])
+            if (args.mac == "disabled") else ["mac", "last_timestamp", "test_uuid"])
         csv_writer.writeheader()
         csv_writer.writerows(outarr)
 
@@ -58,7 +58,8 @@ def list_devices(mac_output="disabled"):
         outarr = list(map(lambda x: {
             "mac": x["mac"],
             "last_timestamp": datetime.fromtimestamp(
-                x["last_timestamp"] / 1000).astimezone().isoformat()
+                x["last_timestamp"] / 1000).astimezone().isoformat(),
+            "test_uuid": x["test_uuid"] if "test_uuid" in x else "N/A"
         }, heartbeats))
         if (mac_output is not None):
             outarr = list(filter(

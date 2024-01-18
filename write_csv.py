@@ -20,6 +20,9 @@ def get_tput_line(mac, json_dict):
                 json_dict["start"]["timestamp"]["timesecs"]
             ).astimezone().isoformat(timespec="seconds"),
             "mac": mac,
+            "test_uuid": (json_dict["start"]["test_uuid"]
+                          if "test_uuid" in json_dict["start"]
+                          else "unknown"),
             "type": "iperf",
             "direction": ("downlink"
                           if json_dict["start"]["test_start"]["reverse"] == 1
@@ -36,14 +39,23 @@ def get_tput_line(mac, json_dict):
                 json_dict["end"]["sum_received"]["bytes"] / 1e6,
             "tput_mbps":
                 json_dict["end"]["sum_received"]["bits_per_second"] / 1e6,
+            "max_tput_mbps":
+                max(map(
+                    lambda x: x["sum"]["bits_per_second"] / 1e6,
+                    json_dict["intervals"]
+                ))
         })
     elif ("type" in json_dict):
         # new speedtest file
         timestamp = datetime.fromisoformat(
             json_dict["timestamp"]).astimezone().isoformat(timespec="seconds")
+        test_uuid = (json_dict["test_uuid"]
+                     if "test_uuid" in json_dict
+                     else "unknown")
         outarr.append({
             "timestamp": timestamp,
             "mac": mac,
+            "test_uuid": test_uuid,
             "type": "speedtest",
             "direction": "downlink",
             "interface": json_dict["interface"]["name"],
@@ -51,11 +63,13 @@ def get_tput_line(mac, json_dict):
             "isp": json_dict["isp"],
             "duration_s": json_dict["download"]["elapsed"] / 1e3,
             "transfered_mbytes": json_dict["download"]["bytes"] / 1e6,
-            "tput_mbps": json_dict["download"]["bandwidth"] * 8 / 1e6
+            "tput_mbps": json_dict["download"]["bandwidth"] * 8 / 1e6,
+            "max_tput_mbps": json_dict["download"]["bandwidth"] * 8 / 1e6
         })
         outarr.append({
             "timestamp": timestamp,
             "mac": mac,
+            "test_uuid": test_uuid,
             "type": "speedtest",
             "direction": "uplink",
             "interface": json_dict["interface"]["name"],
@@ -63,7 +77,8 @@ def get_tput_line(mac, json_dict):
             "isp": json_dict["isp"],
             "duration_s": json_dict["upload"]["elapsed"] / 1e3,
             "transfered_mbytes": json_dict["upload"]["bytes"] / 1e6,
-            "tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6
+            "tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6,
+            "max_tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6
         })
     elif ("beacons" in json_dict):
         pass
@@ -74,6 +89,7 @@ def get_tput_line(mac, json_dict):
         outarr.append({
             "timestamp": timestamp,
             "mac": mac,
+            "test_uuid": "unknown",
             "type": "speedtest",
             "direction": "downlink",
             "interface": "eth0",
@@ -81,11 +97,13 @@ def get_tput_line(mac, json_dict):
             "isp": json_dict["client"]["isp"],
             "duration_s": "NaN",
             "transfered_mbytes": json_dict["bytes_received"] / 1e6,
-            "tput_mbps": json_dict["download"] / 1e6
+            "tput_mbps": json_dict["download"] / 1e6,
+            "max_tput_mbps": json_dict["download"] / 1e6
         })
         outarr.append({
             "timestamp": timestamp,
             "mac": mac,
+            "test_uuid": "unknown",
             "type": "speedtest",
             "direction": "uplink",
             "interface": "eth0",
@@ -93,7 +111,8 @@ def get_tput_line(mac, json_dict):
             "isp": json_dict["client"]["isp"],
             "duration_s": "NaN",
             "transfered_mbytes": json_dict["bytes_sent"] / 1e6,
-            "tput_mbps": json_dict["upload"] / 1e6
+            "tput_mbps": json_dict["upload"] / 1e6,
+            "max_tput_mbps": json_dict["upload"] / 1e6
         })
 
     logging.debug(outarr)
@@ -112,9 +131,13 @@ def get_lat_line(mac, json_dict):
         # new speedtest file
         timestamp = datetime.fromisoformat(
             json_dict["timestamp"]).astimezone().isoformat(timespec="seconds")
+        test_uuid = (json_dict["test_uuid"]
+                     if "test_uuid" in json_dict
+                     else "unknown")
         outarr.append({
             "timestamp": timestamp,
             "mac": mac,
+            "test_uuid": test_uuid,
             "type": "speedtest_idle",
             "interface": json_dict["interface"]["name"],
             "host": json_dict["server"]["host"],
@@ -126,6 +149,7 @@ def get_lat_line(mac, json_dict):
             outarr.append({
                 "timestamp": timestamp,
                 "mac": mac,
+                "test_uuid": test_uuid,
                 "type": "speedtest_dl_load",
                 "interface": json_dict["interface"]["name"],
                 "host": json_dict["server"]["host"],
@@ -137,6 +161,7 @@ def get_lat_line(mac, json_dict):
             outarr.append({
                 "timestamp": timestamp,
                 "mac": mac,
+                "test_uuid": test_uuid,
                 "type": "speedtest_ul_load",
                 "interface": json_dict["interface"]["name"],
                 "host": json_dict["server"]["host"],
@@ -153,6 +178,7 @@ def get_lat_line(mac, json_dict):
         outarr.append({
             "timestamp": timestamp,
             "mac": mac,
+            "test_uuid": "unknown",
             "type": "speedtest_idle",
             "interface": "eth0",
             "host": json_dict["server"]["host"],
@@ -172,6 +198,15 @@ def get_scan_line(mac, json_dict):
 
     timestamp = datetime.fromisoformat(
         json_dict["timestamp"]).astimezone().isoformat(timespec="seconds")
+    test_uuid = "unknown"
+    corr_test = "unknown"
+    if ("extra" in json_dict):
+        test_uuid = (json_dict["extra"]["test_uuid"]
+                     if "test_uuid" in json_dict["extra"]
+                     else "unknown")
+        corr_test = (json_dict["extra"]["corr_test"]
+                     if "corr_test" in json_dict["extra"]
+                     else "unknown")
     for beacon in json_dict["beacons"]:
         primary_ch = int(beacon["channel"])
         primary_freq = int(float(
@@ -179,6 +214,8 @@ def get_scan_line(mac, json_dict):
         outtemp = {
             "timestamp": timestamp,
             "mac": mac,
+            "test_uuid": test_uuid,
+            "corr_test": corr_test,
             "bssid": beacon["bssid"],
             "ssid": beacon["ssid"],
             "rssi_dbm": int(beacon["rssi"][:(len(beacon["rssi"]) - 4)]),
@@ -353,14 +390,17 @@ def write(outarr, args):
         fieldnames = []
         match args.mode:
             case "throughput":
-                fieldnames += ["timestamp", "mac", "type", "direction",
-                               "interface", "host", "isp", "duration_s",
-                               "transfered_mbytes", "tput_mbps"]
+                fieldnames += ["timestamp", "mac", "test_uuid", "type",
+                               "direction", "interface", "host", "isp",
+                               "duration_s", "transfered_mbytes", "tput_mbps",
+                               "max_tput_mbps"]
             case "latency":
-                fieldnames += ["timestamp", "mac", "type", "interface",
-                               "host", "isp", "latency_ms", "jitter_ms"]
+                fieldnames += ["timestamp", "mac", "test_uuid", "type",
+                               "interface", "host", "isp", "latency_ms",
+                               "jitter_ms"]
             case "wifi_scan":
-                fieldnames += ["timestamp", "mac", "bssid", "ssid", "rssi_dbm",
+                fieldnames += ["timestamp", "mac", "test_uuid", "corr_test",
+                               "bssid", "ssid", "rssi_dbm",
                                "primary_channel_num", "primary_freq_mhz",
                                "channel_num", "center_freq0_mhz",
                                "center_freq1_mhz", "bw_mhz", "amendment",
