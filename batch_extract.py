@@ -1,4 +1,6 @@
 import argparse
+from datetime import datetime
+import json
 import logging
 from pathlib import Path
 import subprocess
@@ -141,6 +143,12 @@ def batch_extract(args):
          ".", "-i", "*.json", "*.csv"],
         cwd=str(args.outdir.resolve())).decode("utf-8")
     logging.debug(cmd_out)
+
+    # 5. Write last update JSON
+    with open(args.outdir.joinpath("last_update.json"), "w") as fd:
+        fd.write(json.dumps({
+            "last_update": datetime.now().astimezone().isoformat(
+                timespec="seconds")}))
 
     print("Done!")
 
