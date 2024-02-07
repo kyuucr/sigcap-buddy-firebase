@@ -20,24 +20,34 @@ def write(outarr, args):
         csv_writer.writerows(outarr)
 
 
-def list_devices(mac_output="disabled"):
+def fetch_all():
+    return db.reference("hb_append").get()
+
+
+def get_list(heartbeats):
     outarr = list()
     now_timestamp = datetime.timestamp(datetime.now()) * 1000
 
-    heartbeats = db.reference("hb_append").get()
     for mac in heartbeats:
-        if (mac_output == "disabled"):
-            last = sorted(list(heartbeats[mac].values()),
-                          key=lambda x: x["last_timestamp"],
-                          reverse=True)[0]
-            logging.debug(mac, last)
-            # Online threshold = 1h 2m
-            outarr.append({
-                "mac": mac,
-                "online": (now_timestamp - last["last_timestamp"]) < 3720000,
-                "start_timestamp": last["start_timestamp"],
-                "last_timestamp": last["last_timestamp"]})
-        elif (mac_output == "" or mac == mac_output):
+        last = sorted(list(heartbeats[mac].values()),
+                      key=lambda x: x["last_timestamp"],
+                      reverse=True)[0]
+        logging.debug(mac, last)
+        # Online threshold = 1h 2m
+        outarr.append({
+            "mac": mac,
+            "online": (now_timestamp - last["last_timestamp"]) < 3720000,
+            "start_timestamp": last["start_timestamp"],
+            "last_timestamp": last["last_timestamp"]})
+
+    return sorted(outarr, key=lambda x: (~x["online"], x["mac"]))
+
+
+def get_mac(heartbeats, mac_filter):
+    outarr = list()
+
+    for mac in heartbeats:
+        if (mac_filter == "" or mac == mac_filter):
             for entry in heartbeats[mac].values():
                 outarr.append({
                     "mac": mac,
@@ -46,6 +56,15 @@ def list_devices(mac_output="disabled"):
                     "last_timestamp": entry["last_timestamp"]})
 
     return sorted(outarr, key=lambda x: (~x["online"], x["mac"]))
+
+
+def list_devices(mac_output="disabled"):
+    heartbeats = fetch_all()
+
+    if (mac_output == "disabled"):
+        return get_list(heartbeats)
+    else:
+        return get_mac(heartbeats, mac_output)
 
 
 def parse(list_args=None):
