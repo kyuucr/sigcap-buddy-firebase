@@ -9,63 +9,43 @@ import logging
 import sys
 
 
-def get_last_timestamp(heartbeats, mac):
-    filtered = list(filter(
-        lambda x: x["mac"].replace(":", "-") == mac,
-        heartbeats))
-    last_val = filtered[len(filtered) - 1]
-    logging.debug(last_val)
-
-    return last_val["last_timestamp"]
-
-
 def write(outarr, args):
     if (args.json):
         args.output_file.write(json.dumps(outarr))
     else:
         csv_writer = csv.DictWriter(
             args.output_file,
-            fieldnames=["mac", "online", "last_timestamp"]
-            if (args.mac == "disabled") else ["mac", "last_timestamp", "test_uuid"])
+            fieldnames=["mac", "online", "start_timestamp", "last_timestamp"])
         csv_writer.writeheader()
         csv_writer.writerows(outarr)
 
 
 def list_devices(mac_output="disabled"):
-    heartbeats = db.reference("heartbeat").order_by_child(
-        "last_timestamp").get().values()
+    outarr = list()
+    now_timestamp = datetime.timestamp(datetime.now()) * 1000
 
-    if (mac_output == "disabled"):
-        macs = list(dict.fromkeys(
-            [val["mac"].replace(":", "-") for val in heartbeats]))
-        logging.debug(macs)
-
-        outarr = list()
-        now_timestamp = datetime.timestamp(datetime.now()) * 1000
-
-        for mac in macs:
-            last_timestamp = get_last_timestamp(heartbeats, mac)
+    heartbeats = db.reference("hb_append").get()
+    for mac in heartbeats:
+        if (mac_output == "disabled"):
+            last = sorted(list(heartbeats[mac].values()),
+                          key=lambda x: x["last_timestamp"],
+                          reverse=True)[0]
+            logging.debug(mac, last)
+            # Online threshold = 1h 2m
             outarr.append({
                 "mac": mac,
-                "online": (now_timestamp - last_timestamp) < 3720000,  # 1h 2m
-                "last_timestamp": datetime.fromtimestamp(
-                    last_timestamp / 1000).astimezone().isoformat()
-            })
+                "online": (now_timestamp - last["last_timestamp"]) < 3720000,
+                "start_timestamp": last["start_timestamp"],
+                "last_timestamp": last["last_timestamp"]})
+        elif (mac_output == "" or mac == mac_output):
+            for entry in heartbeats[mac].values():
+                outarr.append({
+                    "mac": mac,
+                    "online": True,
+                    "start_timestamp": entry["start_timestamp"],
+                    "last_timestamp": entry["last_timestamp"]})
 
-        return sorted(outarr, key=lambda x: (~x["online"], x["mac"]))
-
-    else:
-        outarr = list(map(lambda x: {
-            "mac": x["mac"],
-            "last_timestamp": datetime.fromtimestamp(
-                x["last_timestamp"] / 1000).astimezone().isoformat(),
-            "test_uuid": x["test_uuid"] if "test_uuid" in x else "N/A"
-        }, heartbeats))
-        if (mac_output is not None):
-            outarr = list(filter(
-                lambda x: x["mac"].replace(":", "-") == mac_output,
-                outarr))
-        return outarr
+    return sorted(outarr, key=lambda x: (~x["online"], x["mac"]))
 
 
 def parse(list_args=None):
