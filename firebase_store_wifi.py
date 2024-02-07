@@ -20,7 +20,7 @@ def main():
     parser.add_argument("--ssid", type=str, help="Input SSID")
     args = parser.parse_args()
 
-    mac = args.mac
+    mac = args.mac.replace("-", ":")
     if (mac is None):
         mac = input("Input MAC [{}]: ".format(def_mac)).replace("-", ":")
         if (mac == ""):
