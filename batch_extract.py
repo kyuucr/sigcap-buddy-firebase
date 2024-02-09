@@ -19,11 +19,13 @@ def batch_extract(args):
     print("1. Download and zip all logs")
     firebase_download.download(args)
     print("Zipping all logs...")
-    cmd_out = subprocess.check_output(
-        ["zip", "-r",
+    cmd_out = subprocess.run(
+        ["zip", "-ur",
          str(args.outdir.joinpath("all_rawlogs.zip").resolve()),
-         "."], cwd=str(args.log_dir.resolve())).decode("utf-8")
-    logging.debug(cmd_out)
+         "."], cwd=str(args.log_dir.resolve()),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT).stdout.decode("utf-8")
+    logging.info(cmd_out)
 
     print("2. Download and write device states")
     heartbeats = firebase_list_devices.fetch_all()
@@ -122,26 +124,30 @@ def batch_extract(args):
         # 3.5. Zip CSVs & JSONs
         print(f"Compressing CSV and JSON files for {mac}...")
         if (len(out_tput) > 0 or len(out_lat) > 0):
-            cmd_out = subprocess.check_output(
-                ["zip", "-r",
+            cmd_out = subprocess.run(
+                ["zip", "-ur",
                  str(args.outdir.joinpath(
                      "data_{}.zip".format(mac)).resolve()),
                  ".", "-i",
                  "*_{}.json".format(mac),
                  "*_{}.csv".format(mac)],
-                cwd=str(args.outdir.resolve())).decode("utf-8")
-            logging.debug(cmd_out)
+                cwd=str(args.outdir.resolve()),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT).stdout.decode("utf-8")
+            logging.info(cmd_out)
 
         # 3.6. Zip raw logs
         print(f"Compressing raw logs for {mac}...")
         if (args.log_dir.joinpath(mac).is_dir()):
-            cmd_out = subprocess.check_output(
-                ["zip", "-r",
+            cmd_out = subprocess.run(
+                ["zip", "-ur",
                  str(args.outdir.joinpath(
                      "rawlogs_{}.zip".format(mac)).resolve()),
                  "."],
-                cwd=str(args.log_dir.joinpath(mac).resolve())).decode("utf-8")
-            logging.debug(cmd_out)
+                cwd=str(args.log_dir.joinpath(mac).resolve()),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT).stdout.decode("utf-8")
+            logging.info(cmd_out)
 
         # 3.7. Copy main program log
         print(f"Copying main program log for {mac}...")
@@ -152,12 +158,14 @@ def batch_extract(args):
             logging.warning("Copy error: %s", e)
 
     print("4. Compress all CSVs & JSONs")
-    cmd_out = subprocess.check_output(
-        ["zip", "-r",
+    cmd_out = subprocess.run(
+        ["zip", "-ur",
          str(args.outdir.joinpath("all_data.zip").resolve()),
          ".", "-i", "*.json", "*.csv"],
-        cwd=str(args.outdir.resolve())).decode("utf-8")
-    logging.debug(cmd_out)
+        cwd=str(args.outdir.resolve()),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT).stdout.decode("utf-8")
+    logging.info(cmd_out)
 
     print("5. Write last update JSON")
     with open(args.outdir.joinpath("last_update.json"), "w") as fd:
