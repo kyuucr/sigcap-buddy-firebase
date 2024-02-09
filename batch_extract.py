@@ -4,6 +4,7 @@ import json
 import logging
 from pathlib import Path
 import subprocess
+from shutil import copy
 import firebase_admin
 from firebase_admin import credentials
 import firebase_download
@@ -141,6 +142,14 @@ def batch_extract(args):
                  "."],
                 cwd=str(args.log_dir.joinpath(mac).resolve())).decode("utf-8")
             logging.debug(cmd_out)
+
+        # 3.7. Copy main program log
+        print(f"Copying main program log for {mac}...")
+        try:
+            copy(args.log_dir / mac / "speedtest_logger.log",
+                 args.outdir / f"speedtest_logger_{mac}.log")
+        except Exception as e:
+            logging.warning("Copy error: %s", e)
 
     print("4. Compress all CSVs & JSONs")
     cmd_out = subprocess.check_output(
