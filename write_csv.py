@@ -80,6 +80,8 @@ def get_tput_line(mac, json_dict):
             "tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6,
             "max_tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6
         })
+    elif ("pings" in json_dict):
+        pass
     elif ("beacons" in json_dict):
         pass
     else:
@@ -168,6 +170,24 @@ def get_lat_line(mac, json_dict):
                 "isp": json_dict["isp"],
                 "latency_ms": json_dict["upload"]["latency"]["iqm"],
                 "jitter_ms": json_dict["upload"]["latency"]["jitter"]
+            })
+    elif ("pings" in json_dict):
+        iface = json_dict["interface"]
+        test_uuid = json_dict["extra"]["test_uuid"]
+        corr_test = "ping_" + json_dict["extra"]["corr_test"].replace("-", "_")
+        for entry in json_dict["pings"]:
+            outarr.append({
+                "timestamp": datetime.fromisoformat(
+                    entry["responses"][0]["timestamp"]
+                ).astimezone().isoformat(timespec="seconds"),
+                "mac": mac,
+                "test_uuid": test_uuid,
+                "type": corr_test,
+                "interface": iface,
+                "host": entry["destination"],
+                "isp": "unknown",
+                "latency_ms": entry["round_trip_ms_avg"],
+                "jitter_ms": entry["round_trip_ms_stddev"]
             })
     elif ("beacons" in json_dict):
         pass
