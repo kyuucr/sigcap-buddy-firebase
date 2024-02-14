@@ -1,43 +1,60 @@
 import argparse
+from base64 import b64decode
+from crc32c import crc32c
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import storage
 from google.cloud.storage import transfer_manager
 import logging
 from pathlib import Path
+import struct
+
+
+def compare_file_crc32c(path, comp_crc32c):
+    with open(path, "rb") as fd:
+        file_crc = crc32c(fd.read())
+        to_compare = struct.unpack('>I', b64decode(comp_crc32c))[0]
+        return file_crc == to_compare
 
 
 def download(args):
     # Setup
     logging.basicConfig(level=args.log_level.upper())
     logdir = args.log_dir
-    logging.debug("logdir=%s", logdir)
+    logging.info("logdir=%s", logdir)
 
     bucket = storage.bucket()
+    logging.info("Got bucket: %s", bucket.name)
 
     # List files to download
-    all_files = [file.name for file in bucket.list_blobs()]
+    all_files = [{
+        "name": file.name,
+        "crc32c": file.crc32c
+    } for file in bucket.list_blobs()]
     to_download = list(filter(
-        lambda x: not logdir.joinpath(x).exists()
-        or x.endswith("speedtest_logger.log"),
+        lambda x: not logdir.joinpath(x["name"]).exists()
+        or (x["name"].endswith("speedtest_logger.log")
+            and not compare_file_crc32c(
+                logdir.joinpath(x["name"]), x["crc32c"])),
         all_files))
     print("Found %d files to download" % len(to_download))
-    logging.debug(to_download)
+    logging.info(to_download)
 
     results = transfer_manager.download_many_to_path(
-        bucket, to_download, destination_directory=str(logdir),
+        bucket, [val["name"] for val in to_download],
+        destination_directory=str(logdir),
         create_directories=True, max_workers=8
     )
 
-    for name, result in zip(to_download, results):
+    for file, result in zip(to_download, results):
         # The results list is either `None` or an exception for each filename
         # in the input list, in order.
 
         if isinstance(result, Exception):
             logging.warning("Failed to download %s due to exception: %s",
-                            name, result)
+                            file, result)
         else:
-            print("Downloaded %s from %s." % (name, bucket.name))
+            print(f"Downloaded {file['name']} crc32c {file['crc32c']}.")
 
 
 def parse(list_args=None):
