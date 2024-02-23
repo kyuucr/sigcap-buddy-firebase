@@ -176,19 +176,20 @@ def get_lat_line(mac, json_dict):
         test_uuid = json_dict["extra"]["test_uuid"]
         corr_test = "ping_" + json_dict["extra"]["corr_test"].replace("-", "_")
         for entry in json_dict["pings"]:
-            outarr.append({
-                "timestamp": datetime.fromisoformat(
-                    entry["responses"][0]["timestamp"]
-                ).astimezone().isoformat(timespec="seconds"),
-                "mac": mac,
-                "test_uuid": test_uuid,
-                "type": corr_test,
-                "interface": iface,
-                "host": entry["destination"],
-                "isp": "unknown",
-                "latency_ms": entry["round_trip_ms_avg"],
-                "jitter_ms": entry["round_trip_ms_stddev"]
-            })
+            if (len(entry["responses"]) > 0):
+                outarr.append({
+                    "timestamp": datetime.fromisoformat(
+                        entry["responses"][0]["timestamp"]
+                    ).astimezone().isoformat(timespec="seconds"),
+                    "mac": mac,
+                    "test_uuid": test_uuid,
+                    "type": corr_test,
+                    "interface": iface,
+                    "host": entry["destination"],
+                    "isp": "unknown",
+                    "latency_ms": entry["round_trip_ms_avg"],
+                    "jitter_ms": entry["round_trip_ms_stddev"]
+                })
     elif ("beacons" in json_dict):
         pass
     else:
