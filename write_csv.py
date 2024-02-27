@@ -145,6 +145,7 @@ def get_lat_line(mac, json_dict):
             "host": json_dict["server"]["host"],
             "isp": json_dict["isp"],
             "latency_ms": json_dict["ping"]["latency"],
+            "min_latency_ms": json_dict["ping"]["latency"],
             "jitter_ms": json_dict["ping"]["jitter"]
         })
         if ("latency" in json_dict["download"]):
@@ -157,6 +158,7 @@ def get_lat_line(mac, json_dict):
                 "host": json_dict["server"]["host"],
                 "isp": json_dict["isp"],
                 "latency_ms": json_dict["download"]["latency"]["iqm"],
+                "min_latency_ms": json_dict["download"]["latency"]["iqm"],
                 "jitter_ms": json_dict["download"]["latency"]["jitter"]
             })
         if ("latency" in json_dict["upload"]):
@@ -169,6 +171,7 @@ def get_lat_line(mac, json_dict):
                 "host": json_dict["server"]["host"],
                 "isp": json_dict["isp"],
                 "latency_ms": json_dict["upload"]["latency"]["iqm"],
+                "min_latency_ms": json_dict["upload"]["latency"]["iqm"],
                 "jitter_ms": json_dict["upload"]["latency"]["jitter"]
             })
     elif ("pings" in json_dict):
@@ -188,6 +191,7 @@ def get_lat_line(mac, json_dict):
                     "host": entry["destination"],
                     "isp": "unknown",
                     "latency_ms": entry["round_trip_ms_avg"],
+                    "min_latency_ms": entry["round_trip_ms_min"],
                     "jitter_ms": entry["round_trip_ms_stddev"]
                 })
     elif ("beacons" in json_dict):
@@ -418,7 +422,7 @@ def write(outarr, args):
             case "latency":
                 fieldnames += ["timestamp", "mac", "test_uuid", "type",
                                "interface", "host", "isp", "latency_ms",
-                               "jitter_ms"]
+                               "min_latency_ms", "jitter_ms"]
             case "wifi_scan":
                 fieldnames += ["timestamp", "mac", "test_uuid", "corr_test",
                                "bssid", "ssid", "rssi_dbm",
