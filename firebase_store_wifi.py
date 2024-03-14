@@ -32,6 +32,12 @@ def main():
 
     passwd = getpass()
 
+    # Delete previous entries
+    prev_entry = db.reference("wifi").order_by_child("mac").equal_to(
+        mac).get()
+    for key in prev_entry:
+        db.reference("wifi").child(key).delete()
+    # Add new entry
     db.reference("wifi").push().set({"mac": mac, "ssid": ssid, "pass": passwd})
     print("MAC {} SSID {} successfully added!".format(mac, ssid))
 
