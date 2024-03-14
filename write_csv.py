@@ -3,6 +3,7 @@ import csv
 from datetime import datetime
 import json
 import logging
+import numpy as np
 from pathlib import Path
 import sys
 import wifi_helper
@@ -15,6 +16,9 @@ def get_tput_line(mac, json_dict):
 
     if ("start" in json_dict):
         # iperf file
+        iperf_tputs = list(map(
+            lambda x: x["sum"]["bits_per_second"] / 1e6,
+            json_dict["intervals"]))
         outarr.append({
             "timestamp": datetime.fromtimestamp(
                 json_dict["start"]["timestamp"]["timesecs"]
@@ -39,11 +43,10 @@ def get_tput_line(mac, json_dict):
                 json_dict["end"]["sum_received"]["bytes"] / 1e6,
             "tput_mbps":
                 json_dict["end"]["sum_received"]["bits_per_second"] / 1e6,
-            "max_tput_mbps":
-                max(map(
-                    lambda x: x["sum"]["bits_per_second"] / 1e6,
-                    json_dict["intervals"]
-                ))
+            "std_tput_mbps": np.std(iperf_tputs),
+            "max_tput_mbps": max(iperf_tputs),
+            "min_tput_mbps": min(iperf_tputs),
+            "median_tput_mbps": np.median(iperf_tputs)
         })
     elif ("type" in json_dict):
         # new speedtest file
@@ -64,7 +67,10 @@ def get_tput_line(mac, json_dict):
             "duration_s": json_dict["download"]["elapsed"] / 1e3,
             "transfered_mbytes": json_dict["download"]["bytes"] / 1e6,
             "tput_mbps": json_dict["download"]["bandwidth"] * 8 / 1e6,
-            "max_tput_mbps": json_dict["download"]["bandwidth"] * 8 / 1e6
+            "std_tput_mbps": "NaN",
+            "max_tput_mbps": json_dict["download"]["bandwidth"] * 8 / 1e6,
+            "min_tput_mbps": json_dict["download"]["bandwidth"] * 8 / 1e6,
+            "median_tput_mbps": json_dict["download"]["bandwidth"] * 8 / 1e6
         })
         outarr.append({
             "timestamp": timestamp,
@@ -78,7 +84,10 @@ def get_tput_line(mac, json_dict):
             "duration_s": json_dict["upload"]["elapsed"] / 1e3,
             "transfered_mbytes": json_dict["upload"]["bytes"] / 1e6,
             "tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6,
-            "max_tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6
+            "std_tput_mbps": "NaN",
+            "max_tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6,
+            "min_tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6,
+            "median_tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6
         })
     elif ("pings" in json_dict):
         pass
@@ -100,7 +109,10 @@ def get_tput_line(mac, json_dict):
             "duration_s": "NaN",
             "transfered_mbytes": json_dict["bytes_received"] / 1e6,
             "tput_mbps": json_dict["download"] / 1e6,
-            "max_tput_mbps": json_dict["download"] / 1e6
+            "std_tput_mbps": "NaN",
+            "max_tput_mbps": json_dict["download"] / 1e6,
+            "min_tput_mbps": json_dict["download"] / 1e6,
+            "median_tput_mbps": json_dict["download"] / 1e6
         })
         outarr.append({
             "timestamp": timestamp,
@@ -114,7 +126,10 @@ def get_tput_line(mac, json_dict):
             "duration_s": "NaN",
             "transfered_mbytes": json_dict["bytes_sent"] / 1e6,
             "tput_mbps": json_dict["upload"] / 1e6,
-            "max_tput_mbps": json_dict["upload"] / 1e6
+            "std_tput_mbps": "NaN",
+            "max_tput_mbps": json_dict["upload"] / 1e6,
+            "min_tput_mbps": json_dict["upload"] / 1e6,
+            "median_tput_mbps": json_dict["upload"] / 1e6
         })
 
     logging.debug(outarr)
@@ -145,8 +160,10 @@ def get_lat_line(mac, json_dict):
             "host": json_dict["server"]["host"],
             "isp": json_dict["isp"],
             "latency_ms": json_dict["ping"]["latency"],
+            "jitter_ms": json_dict["ping"]["jitter"],
             "min_latency_ms": json_dict["ping"]["latency"],
-            "jitter_ms": json_dict["ping"]["jitter"]
+            "max_latency_ms": json_dict["ping"]["latency"],
+            "median_latency_ms": json_dict["ping"]["latency"]
         })
         if ("latency" in json_dict["download"]):
             outarr.append({
@@ -158,8 +175,10 @@ def get_lat_line(mac, json_dict):
                 "host": json_dict["server"]["host"],
                 "isp": json_dict["isp"],
                 "latency_ms": json_dict["download"]["latency"]["iqm"],
+                "jitter_ms": json_dict["download"]["latency"]["jitter"],
                 "min_latency_ms": json_dict["download"]["latency"]["iqm"],
-                "jitter_ms": json_dict["download"]["latency"]["jitter"]
+                "max_latency_ms": json_dict["download"]["latency"]["iqm"],
+                "median_latency_ms": json_dict["download"]["latency"]["iqm"]
             })
         if ("latency" in json_dict["upload"]):
             outarr.append({
@@ -171,29 +190,38 @@ def get_lat_line(mac, json_dict):
                 "host": json_dict["server"]["host"],
                 "isp": json_dict["isp"],
                 "latency_ms": json_dict["upload"]["latency"]["iqm"],
+                "jitter_ms": json_dict["upload"]["latency"]["jitter"],
                 "min_latency_ms": json_dict["upload"]["latency"]["iqm"],
-                "jitter_ms": json_dict["upload"]["latency"]["jitter"]
+                "max_latency_ms": json_dict["upload"]["latency"]["iqm"],
+                "median_latency_ms": json_dict["upload"]["latency"]["iqm"]
             })
     elif ("pings" in json_dict):
-        iface = json_dict["interface"]
-        test_uuid = json_dict["extra"]["test_uuid"]
-        corr_test = "ping_" + json_dict["extra"]["corr_test"].replace("-", "_")
-        for entry in json_dict["pings"]:
-            if (len(entry["responses"]) > 0):
-                outarr.append({
-                    "timestamp": datetime.fromisoformat(
-                        entry["responses"][0]["timestamp"]
-                    ).astimezone().isoformat(timespec="seconds"),
-                    "mac": mac,
-                    "test_uuid": test_uuid,
-                    "type": corr_test,
-                    "interface": iface,
-                    "host": entry["destination"],
-                    "isp": "unknown",
-                    "latency_ms": entry["round_trip_ms_avg"],
-                    "min_latency_ms": entry["round_trip_ms_min"],
-                    "jitter_ms": entry["round_trip_ms_stddev"]
-                })
+        if (json_dict["pings"] is not None):
+            iface = json_dict["interface"]
+            test_uuid = json_dict["extra"]["test_uuid"]
+            corr_test = "ping_" + json_dict["extra"]["corr_test"].replace(
+                "-", "_")
+            for entry in json_dict["pings"]:
+                if (len(entry["responses"]) > 0):
+                    latencies_ms = list(map(
+                        lambda x: x["time_ms"],
+                        entry["responses"]))
+                    outarr.append({
+                        "timestamp": datetime.fromisoformat(
+                            entry["responses"][0]["timestamp"]
+                        ).astimezone().isoformat(timespec="seconds"),
+                        "mac": mac,
+                        "test_uuid": test_uuid,
+                        "type": corr_test,
+                        "interface": iface,
+                        "host": entry["destination"],
+                        "isp": "unknown",
+                        "latency_ms": entry["round_trip_ms_avg"],
+                        "jitter_ms": entry["round_trip_ms_stddev"],
+                        "min_latency_ms": entry["round_trip_ms_min"],
+                        "max_latency_ms": entry["round_trip_ms_max"],
+                        "median_latency_ms": np.median(latencies_ms)
+                    })
     elif ("beacons" in json_dict):
         pass
     else:
@@ -209,7 +237,10 @@ def get_lat_line(mac, json_dict):
             "host": json_dict["server"]["host"],
             "isp": json_dict["client"]["isp"],
             "latency_ms": json_dict["ping"],
-            "jitter_ms": "NaN"
+            "jitter_ms": "NaN",
+            "min_latency_ms": json_dict["ping"],
+            "max_latency_ms": json_dict["ping"],
+            "median_latency_ms": json_dict["ping"]
         })
 
     logging.debug(outarr)
@@ -218,7 +249,7 @@ def get_lat_line(mac, json_dict):
 
 def get_scan_line(mac, json_dict):
     outlist = list()
-    if ("beacons" not in json_dict):
+    if ("beacons" not in json_dict or json_dict["beacons"] is None):
         return outlist
 
     timestamp = datetime.fromisoformat(
@@ -418,11 +449,13 @@ def write(outarr, args):
                 fieldnames += ["timestamp", "mac", "test_uuid", "type",
                                "direction", "interface", "host", "isp",
                                "duration_s", "transfered_mbytes", "tput_mbps",
-                               "max_tput_mbps"]
+                               "std_tput_mbps", "max_tput_mbps",
+                               "min_tput_mbps", "median_tput_mbps"]
             case "latency":
                 fieldnames += ["timestamp", "mac", "test_uuid", "type",
                                "interface", "host", "isp", "latency_ms",
-                               "min_latency_ms", "jitter_ms"]
+                               "jitter_ms", "min_latency_ms", "max_latency_ms",
+                               "median_latency_ms"]
             case "wifi_scan":
                 fieldnames += ["timestamp", "mac", "test_uuid", "corr_test",
                                "bssid", "ssid", "rssi_dbm",
