@@ -9,6 +9,18 @@ import sys
 import wifi_helper
 
 
+def dict_reader(input_dict, nan_val, *dict_args):
+    curr = input_dict
+
+    # recursively read curr until arg not found or reached the end
+    for arg in dict_args:
+        if (arg not in curr):
+            return nan_val
+        curr = curr[arg]
+
+    return curr
+
+
 def get_tput_line(mac, json_dict):
     outarr = list()
     if ("error" in json_dict):
@@ -216,10 +228,14 @@ def get_lat_line(mac, json_dict):
                         "interface": iface,
                         "host": entry["destination"],
                         "isp": "unknown",
-                        "latency_ms": entry["round_trip_ms_avg"],
-                        "jitter_ms": entry["round_trip_ms_stddev"],
-                        "min_latency_ms": entry["round_trip_ms_min"],
-                        "max_latency_ms": entry["round_trip_ms_max"],
+                        "latency_ms": dict_reader(
+                            entry, "NaN", "round_trip_ms_avg"),
+                        "jitter_ms": dict_reader(
+                            entry, "NaN", "round_trip_ms_stddev"),
+                        "min_latency_ms": dict_reader(
+                            entry, "NaN", "round_trip_ms_min"),
+                        "max_latency_ms": dict_reader(
+                            entry, "NaN", "round_trip_ms_max"),
                         "median_latency_ms": np.median(latencies_ms)
                     })
     elif ("beacons" in json_dict):
