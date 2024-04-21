@@ -29,7 +29,7 @@ def batch_extract(args):
 
     print("2. Download and write device states")
     heartbeats = firebase_list_devices.fetch_all()
-    list_devices = firebase_list_devices.get_list(heartbeats)
+    list_devices = firebase_list_devices.get_list(heartbeats, args.log_dir)
     macs = [entry["mac"] for entry in list_devices]
     logging.info(macs)
     # 2.1 Write as JSON
