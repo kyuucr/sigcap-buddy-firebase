@@ -7,7 +7,9 @@ from firebase_admin import storage
 from google.cloud.storage import transfer_manager
 import logging
 from pathlib import Path
+from shutil import which
 import struct
+import subprocess
 
 
 def compare_file_crc32c(path, comp_crc32c):
@@ -17,7 +19,7 @@ def compare_file_crc32c(path, comp_crc32c):
         return file_crc == to_compare
 
 
-def download(args):
+def download_firebase(args):
     # Setup
     logging.basicConfig(level=args.log_level.upper())
     logdir = args.log_dir
@@ -57,8 +59,41 @@ def download(args):
             print(f"Downloaded {file['name']} crc32c {file['crc32c']}.")
 
 
+def rsync(args):
+    if which("rsync") is None:
+        raise Exception("rsync is not installed!")
+
+    rsync_path = Path(".rsync")
+    if (rsync_path.is_file()):
+        with open(rsync_path, "r") as fd:
+            src = fd.read()
+    else:
+        src = input("Input source dir path: ")
+    cmd = f"rsync -avv {src} {args.log_dir.parent}"
+    logging.info("Running command: %s", cmd)
+    result = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True)
+    if (result.returncode == 0 or not result.stderr):
+        logging.debug(result.stdout.decode("utf-8"))
+        print("rsync success!")
+    else:
+        logging.error(result.stderr.decode("utf-8"))
+
+
+def download(args):
+    if (args.rsync):
+        rsync(args)
+    else:
+        download_firebase(args)
+
+
 def parse(list_args=None):
     parser = argparse.ArgumentParser()
+    parser.add_argument("--rsync", action="store_true",
+                        help="Use rsync to server instead of Firebase")
     parser.add_argument("-d", "--log-dir", type=Path, default=Path("./logs"),
                         help="Specify local log directory, default='./logs'")
     parser.add_argument("-l", "--log-level", default="warning",
@@ -75,4 +110,6 @@ if __name__ == '__main__':
     firebase_admin.initialize_app(cred, {
         "storageBucket": "nd-schmidt.appspot.com"
     })
-    download(parse())
+    args = parse()
+    logging.basicConfig(level=args.log_level.upper())
+    download(args)

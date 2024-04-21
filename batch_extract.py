@@ -182,6 +182,8 @@ def parse(list_args=None):
                         help="Specify output directory.")
     parser.add_argument("-d", "--log-dir", type=Path, default=Path("./logs"),
                         help="Specify local log directory, default='./logs'")
+    parser.add_argument("--rsync", action="store_true",
+                        help="Use rsync to server instead of Firebase")
     parser.add_argument("-l", "--log-level", default="warning",
                         help="Provide logging level, default is warning'")
     if (list_args is None):
