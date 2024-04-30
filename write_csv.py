@@ -216,8 +216,12 @@ def get_lat_line(mac, json_dict):
             for entry in json_dict["pings"]:
                 if (len(entry["responses"]) > 0):
                     latencies_ms = list(map(
-                        lambda x: x["time_ms"],
+                        lambda x: x["time_ms"] if "time_ms" in x else "NaN",
                         entry["responses"]))
+                    latencies_ms = [lat for lat in latencies_ms
+                                    if lat != "NaN"]
+                    lat_median = ("NaN" if len(latencies_ms) == 0
+                                  else np.median(latencies_ms))
                     outarr.append({
                         "timestamp": datetime.fromisoformat(
                             entry["responses"][0]["timestamp"]
@@ -236,7 +240,7 @@ def get_lat_line(mac, json_dict):
                             entry, "NaN", "round_trip_ms_min"),
                         "max_latency_ms": dict_reader(
                             entry, "NaN", "round_trip_ms_max"),
-                        "median_latency_ms": np.median(latencies_ms)
+                        "median_latency_ms": lat_median
                     })
     elif ("beacons" in json_dict):
         pass
