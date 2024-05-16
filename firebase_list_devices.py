@@ -97,6 +97,8 @@ def get_list(heartbeats, log_dir):
     now_timestamp = datetime.timestamp(datetime.now()) * 1000
 
     for mac in heartbeats:
+        heartbeats[mac] = {key: value for key, value in heartbeats[mac].items()
+                           if isinstance(value, dict)}
         last = sorted(list(heartbeats[mac].values()),
                       key=lambda x: x["last_timestamp"],
                       reverse=True)[0]
