@@ -214,6 +214,9 @@ def get_lat_line(mac, json_dict):
             corr_test = "ping_" + json_dict["extra"]["corr_test"].replace(
                 "-", "_")
             for entry in json_dict["pings"]:
+                entry["responses"] = list(
+                    filter(lambda x: ("type" in x and x["type"] == "reply"),
+                           entry["responses"]))
                 if (len(entry["responses"]) > 0):
                     latencies_ms = list(map(
                         lambda x: x["time_ms"] if "time_ms" in x else "NaN",
