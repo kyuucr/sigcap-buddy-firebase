@@ -16,10 +16,10 @@ def write(outarr, args):
     else:
         fieldnames = []
         if (args.mac == "disabled"):
-            fieldnames += ["mac", "online", "start_timestamp",
+            fieldnames += ["mac", "rpi_id", "online", "start_timestamp",
                            "last_timestamp", "last_test_eth", "last_test_wlan"]
         else:
-            fieldnames += ["mac", "online", "start_timestamp",
+            fieldnames += ["mac", "rpi_id", "online", "start_timestamp",
                            "last_timestamp"]
         csv_writer = csv.DictWriter(
             args.output_file,
@@ -92,7 +92,21 @@ def get_last_tests(mac, log_dir):
     return output
 
 
-def get_list(heartbeats, log_dir):
+def get_rpi_id(rpi_ids, mac):
+    if not rpi_ids:
+        return "NaN"
+
+    logging.info("Get Pi ID for mac: %s", mac)
+    rpi_id = [key for key, val in rpi_ids.items() if val == mac]
+    logging.debug("Got rpi_id: %s", rpi_id)
+    if len(rpi_id) == 0:
+        logging.info("mac %s not found in the list of Pi IDs", mac)
+        return "NaN"
+    else:
+        return rpi_id[0]
+
+
+def get_list(heartbeats, log_dir, rpi_ids):
     outarr = list()
     now_timestamp = datetime.timestamp(datetime.now()) * 1000
 
@@ -107,23 +121,26 @@ def get_list(heartbeats, log_dir):
         # Online threshold = 1h 2m
         outarr.append({
             "mac": mac,
+            "rpi_id": get_rpi_id(rpi_ids, mac),
             "online": (now_timestamp - last["last_timestamp"]) < 3720000,
             "start_timestamp": last["start_timestamp"],
             "last_timestamp": last["last_timestamp"],
             "last_test_eth": last_tests["eth"],
             "last_test_wlan": last_tests["wla"]})
 
-    return sorted(outarr, key=lambda x: (~x["online"], x["mac"]))
+    return sorted(outarr, key=lambda x: (~x["online"], x["rpi_id"], x["mac"]))
 
 
-def get_mac(heartbeats, mac_filter):
+def get_mac(heartbeats, mac_filter, rpi_ids):
     outarr = list()
 
     for mac in heartbeats:
+        rpi_id = get_rpi_id(rpi_ids, mac)
         if (mac_filter == "" or mac == mac_filter):
             for entry in heartbeats[mac].values():
                 outarr.append({
                     "mac": mac,
+                    "rpi_id": rpi_id,
                     "online": True,
                     "start_timestamp": entry["start_timestamp"],
                     "last_timestamp": entry["last_timestamp"]})
@@ -133,11 +150,15 @@ def get_mac(heartbeats, mac_filter):
 
 def list_devices(args):
     heartbeats = fetch_all()
+    rpi_ids = None
+    if args.rpi_config:
+        with open(args.rpi_config) as file:
+            rpi_ids = json.load(file)
 
     if (args.mac == "disabled"):
-        return get_list(heartbeats, args.log_dir)
+        return get_list(heartbeats, args.log_dir, rpi_ids)
     else:
-        return get_mac(heartbeats, args.mac)
+        return get_mac(heartbeats, args.mac, rpi_ids)
 
 
 def parse(list_args=None):
@@ -151,6 +172,8 @@ def parse(list_args=None):
                         help="Output result to file, default is to stdout'")
     parser.add_argument("-d", "--log-dir", type=Path, default=Path("./logs"),
                         help="Specify local log directory, default='./logs'")
+    parser.add_argument("--rpi-config", type=Path,
+                        help="Specify RPI config file for RPI-ID translation")
     parser.add_argument("-l", "--log-level", default="warning",
                         help="Provide logging level, default is warning'")
     if (list_args is None):
