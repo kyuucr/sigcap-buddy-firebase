@@ -15,6 +15,11 @@ import write_csv
 def batch_extract(args):
     # Setup
     logging.basicConfig(level=args.log_level.upper())
+    rpi_ids = None
+    rpi_config = Path(".rpi-config.json")
+    if rpi_config.is_file():
+        with open(rpi_config) as file:
+            rpi_ids = json.load(file)
 
     print("1. Download and zip all logs")
     firebase_download.download(args)
@@ -29,7 +34,9 @@ def batch_extract(args):
 
     print("2. Download and write device states")
     heartbeats = firebase_list_devices.fetch_all()
-    list_devices = firebase_list_devices.get_list(heartbeats, args.log_dir)
+    list_devices = firebase_list_devices.get_list(heartbeats,
+                                                  args.log_dir,
+                                                  rpi_ids)
     macs = [entry["mac"] for entry in list_devices]
     logging.info(macs)
     # 2.1 Write as JSON
@@ -105,7 +112,7 @@ def batch_extract(args):
                  "-l", args.log_level]))
 
         # 3.4. Write heartbeats
-        out_hbeat = firebase_list_devices.get_mac(heartbeats, mac)
+        out_hbeat = firebase_list_devices.get_mac(heartbeats, mac, rpi_ids)
         print(f"Writing heartbeat CSV and JSON for {mac}...")
         if (len(out_hbeat) > 0):
             firebase_list_devices.write(
