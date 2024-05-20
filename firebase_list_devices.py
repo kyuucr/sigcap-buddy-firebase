@@ -40,14 +40,14 @@ def get_last_tests(mac, log_dir):
 
     iperf_dir = log_dir.joinpath(mac, "iperf-log")
     speedtest_dir = log_dir.joinpath(mac, "speedtest-log")
-    # Sort desc and take the first 4
+    # Sort desc and take the first 8
     files = sorted(
         [path for path in iperf_dir.rglob("*") if path.is_file()],
-        reverse=True)[:4]
-    # Sort desc and take the first 2
+        reverse=True)[:8]
+    # Sort desc and take the first 4
     files += sorted(
         [path for path in speedtest_dir.rglob("*") if path.is_file()],
-        reverse=True)[:2]
+        reverse=True)[:4]
     logging.info(files)
 
     for file in files:
