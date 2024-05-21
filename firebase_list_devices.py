@@ -1,6 +1,6 @@
 import argparse
 import csv
-from datetime import datetime
+from datetime import datetime, timezone
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db
@@ -32,54 +32,91 @@ def fetch_all():
     return db.reference("hb_append").get()
 
 
-def get_last_tests(mac, log_dir):
+def read_json(file):
+    logging.info("Reading %s", file)
+    with open(file) as fd:
+        try:
+            json_dict = json.load(fd)
+        except Exception as err:
+            logging.debug("Cannot parse file %s as JSON, reason=%s",
+                          file, err)
+            return None
+        else:
+            return json_dict
+
+
+def get_last_tests(mac, log_dir, now_timestamp):
     output = {
         "eth": None,
         "wla": None
     }
 
-    iperf_dir = log_dir.joinpath(mac, "iperf-log")
+    # Check speedtest first since speedtest runs last
     speedtest_dir = log_dir.joinpath(mac, "speedtest-log")
-    # Sort desc and take the first 8
-    files = sorted(
-        [path for path in iperf_dir.rglob("*") if path.is_file()],
-        reverse=True)[:8]
-    # Sort desc and take the first 4
-    files += sorted(
+    speedtest_files = sorted(
         [path for path in speedtest_dir.rglob("*") if path.is_file()],
-        reverse=True)[:4]
-    logging.info(files)
+        reverse=True)
 
-    for file in files:
-        logging.info("Reading %s", file)
-        with open(file) as fd:
-            json_dict = dict()
-            try:
-                json_dict = json.load(fd)
-            except Exception as err:
-                logging.debug("Cannot parse file %s as JSON, reason=%s",
-                              file, err)
-            else:
-                if ("error" in json_dict):
-                    continue
-                if ("start" in json_dict):
-                    iface = (json_dict["start"]["interface"][:3]
-                             if "interface" in json_dict["start"]
-                             else "eth")
-                    time = datetime.fromtimestamp(
-                        json_dict["start"]["timestamp"]["timesecs"]
-                    ).astimezone()
-                else:
-                    iface = (json_dict["interface"]["name"][:3]
-                             if "interface" in json_dict
-                             else "eth")
-                    time = datetime.fromisoformat(
-                        json_dict["timestamp"]).astimezone()
+    logging.debug(speedtest_files)
+    for file in speedtest_files:
+        json_dict = read_json(file)
+        if json_dict is None or "error" in json_dict:
+            continue
 
-                logging.info("Got iface %s, time %s",
-                             iface, time.isoformat(timespec="seconds"))
-                if (output[iface] is None or output[iface] < time):
-                    output[iface] = time
+        # Get interface and timestamp
+        iface = (json_dict["interface"]["name"][:3]
+                 if "interface" in json_dict
+                 else "eth")
+        time = datetime.fromisoformat(json_dict["timestamp"])
+        logging.info("Got iface %s, time %s",
+                     iface, time.isoformat(timespec="seconds"))
+
+        # Assign output if it is unassigned
+        if output[iface] is None:
+            output[iface] = time
+
+        # Exit if output is assigned for all interfaces
+        # or the log timestamp is more than a day
+        if ((output["eth"] is not None and output["wla"] is not None)
+                or (now_timestamp - time).total_seconds() > 86400):
+            logging.info("Exiting log file reads, output: %s, time diff %ds",
+                         output, (now_timestamp - time).total_seconds())
+            break
+
+    # Check iperf files if one of the interface timestamp is not assigned
+    if (output["eth"] is None or output["wla"] is None):
+        iperf_dir = log_dir.joinpath(mac, "iperf-log")
+        iperf_files = sorted(
+            [path for path in iperf_dir.rglob("*") if path.is_file()],
+            reverse=True)
+
+        logging.debug(iperf_files)
+        for file in iperf_files:
+            json_dict = read_json(file)
+            if json_dict is None or "error" in json_dict:
+                continue
+
+            # Get interface and timestamp
+            iface = (json_dict["start"]["interface"][:3]
+                     if "interface" in json_dict["start"]
+                     else "eth")
+            time = datetime.fromtimestamp(
+                json_dict["start"]["timestamp"]["timesecs"]).astimezone()
+            logging.info("Got iface %s, time %s",
+                         iface, time.isoformat(timespec="seconds"))
+
+            # Assign output if it is unassigned
+            if output[iface] is None:
+                output[iface] = time
+
+            # Exit if output is assigned for all interfaces
+            # or the log timestamp is more than a day
+            if ((output["eth"] is not None and output["wla"] is not None)
+                    or (now_timestamp - time).total_seconds() > 86400):
+                logging.info(("Exiting log file reads, output: %s, "
+                              "time diff %ds"),
+                             output, (now_timestamp - time).total_seconds())
+                break
 
     # Convert to timestamp
     output["eth"] = (datetime.timestamp(output["eth"]) * 1000
@@ -108,7 +145,9 @@ def get_rpi_id(rpi_ids, mac):
 
 def get_list(heartbeats, log_dir, rpi_ids):
     outarr = list()
-    now_timestamp = datetime.timestamp(datetime.now()) * 1000
+    now_timestamp = datetime.now(timezone.utc).astimezone()
+    logging.info("Current time: %s",
+                 now_timestamp.isoformat(timespec="seconds"))
 
     for mac in heartbeats:
         heartbeats[mac] = {key: value for key, value in heartbeats[mac].items()
@@ -116,13 +155,17 @@ def get_list(heartbeats, log_dir, rpi_ids):
         last = sorted(list(heartbeats[mac].values()),
                       key=lambda x: x["last_timestamp"],
                       reverse=True)[0]
-        last_tests = get_last_tests(mac, log_dir)
-        logging.debug(mac, last)
         # Online threshold = 1h 2m
+        online = (datetime.timestamp(now_timestamp) * 1000 - last[
+            "last_timestamp"]) < 3720000    # ms
+        last_tests = {"eth": "NaN", "wla": "NaN"}
+        if online:
+            last_tests = get_last_tests(mac, log_dir, now_timestamp)
+        logging.debug(mac, last)
         outarr.append({
             "mac": mac,
             "rpi_id": get_rpi_id(rpi_ids, mac),
-            "online": (now_timestamp - last["last_timestamp"]) < 3720000,
+            "online": online,
             "start_timestamp": last["start_timestamp"],
             "last_timestamp": last["last_timestamp"],
             "last_test_eth": last_tests["eth"],
