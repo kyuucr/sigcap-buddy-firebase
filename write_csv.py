@@ -279,6 +279,8 @@ def get_scan_line(mac, json_dict):
         json_dict["timestamp"]).astimezone().isoformat(timespec="seconds")
     test_uuid = "unknown"
     corr_test = "unknown"
+    interface = (json_dict["interface"] if "interface" in json_dict
+                 else "unknown")
     if ("extra" in json_dict):
         test_uuid = (json_dict["extra"]["test_uuid"]
                      if "test_uuid" in json_dict["extra"]
@@ -295,6 +297,7 @@ def get_scan_line(mac, json_dict):
             "mac": mac,
             "test_uuid": test_uuid,
             "corr_test": corr_test,
+            "interface": interface,
             "bssid": beacon["bssid"],
             "ssid": beacon["ssid"],
             "rssi_dbm": int(beacon["rssi"][:(len(beacon["rssi"]) - 4)]),
@@ -481,7 +484,7 @@ def write(outarr, args):
                                "median_latency_ms"]
             case "wifi_scan":
                 fieldnames += ["timestamp", "mac", "test_uuid", "corr_test",
-                               "bssid", "ssid", "rssi_dbm",
+                               "interface", "bssid", "ssid", "rssi_dbm",
                                "primary_channel_num", "primary_freq_mhz",
                                "channel_num", "center_freq0_mhz",
                                "center_freq1_mhz", "bw_mhz", "amendment",
@@ -504,6 +507,21 @@ def read_logs(args):
             files += [path for path in currdir.rglob("*") if path.is_file()]
     else:
         files = [path for path in args.log_dir.rglob("*") if path.is_file()]
+
+    match args.mode:
+        case "throughput":
+            files = list(filter(lambda x: ("iperf-log" in str(x)
+                                           or "speedtest-log" in str(x)),
+                                files))
+        case "latency":
+            files = list(filter(lambda x: ("ping-log" in str(x)
+                                           or "speedtest-log" in str(x)),
+                                files))
+        case "wifi_scan":
+            files = list(filter(lambda x: "wifi-scan" in str(x), files))
+        case _:
+            logging.warning("Unknown mode: %s", args.mode)
+
     logging.info(files)
 
     outarr = list()
