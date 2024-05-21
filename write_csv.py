@@ -5,8 +5,21 @@ import json
 import logging
 import numpy as np
 from pathlib import Path
+import re
 import sys
 import wifi_helper
+
+
+re_dbm = re.compile(r"([-\d\.]+) dBm")
+re_mbps = re.compile(r"([-\d\.]+) MBit/s")
+
+
+def dbm_to_mw(dbm):
+    return 10 ** (dbm / 10)
+
+
+def mw_to_dbm(mw):
+    return 10 * np.log10(mw)
 
 
 def dict_reader(input_dict, nan_val, *dict_args):
@@ -288,6 +301,53 @@ def get_scan_line(mac, json_dict):
         corr_test = (json_dict["extra"]["corr_test"]
                      if "corr_test" in json_dict["extra"]
                      else "unknown")
+
+    # Process link
+    links = {
+        "link_mean_rssi_dbm": "NaN",
+        "link_max_rssi_dbm": "NaN",
+        "link_min_rssi_dbm": "NaN",
+        "link_median_rssi_dbm": "NaN",
+        "link_mean_tx_bitrate_mbps": "NaN",
+        "link_max_tx_bitrate_mbps": "NaN",
+        "link_min_tx_bitrate_mbps": "NaN",
+        "link_median_tx_bitrate_mbps": "NaN",
+        "link_mean_rx_bitrate_mbps": "NaN",
+        "link_max_rx_bitrate_mbps": "NaN",
+        "link_min_rx_bitrate_mbps": "NaN",
+        "link_median_rx_bitrate_mbps": "NaN"
+    }
+    if "links" in json_dict:
+        rssi_dbm = [re_dbm.findall(val["rssi"]) for val in json_dict["links"]]
+        rssi_dbm = np.array([int(val[0]) for val in rssi_dbm if len(val) > 0])
+        if len(rssi_dbm) > 0:
+            links["link_mean_rssi_dbm"] = mw_to_dbm(np.mean(dbm_to_mw(
+                rssi_dbm)))
+            links["link_max_rssi_dbm"] = np.max(rssi_dbm)
+            links["link_min_rssi_dbm"] = np.min(rssi_dbm)
+            links["link_median_rssi_dbm"] = np.median(rssi_dbm)
+
+        tx_bitrate_mbps = [re_mbps.findall(val["tx_bitrate"])
+                           for val in json_dict["links"]]
+        tx_bitrate_mbps = [float(val[0]) for val in tx_bitrate_mbps
+                           if len(val) > 0]
+        if len(tx_bitrate_mbps) > 0:
+            links["link_mean_tx_bitrate_mbps"] = np.mean(tx_bitrate_mbps)
+            links["link_max_tx_bitrate_mbps"] = np.max(tx_bitrate_mbps)
+            links["link_min_tx_bitrate_mbps"] = np.min(tx_bitrate_mbps)
+            links["link_median_tx_bitrate_mbps"] = np.median(tx_bitrate_mbps)
+
+        rx_bitrate_mbps = [re_mbps.findall(val["rx_bitrate"])
+                           for val in json_dict["links"]]
+        rx_bitrate_mbps = [float(val[0]) for val in rx_bitrate_mbps
+                           if len(val) > 0]
+        if len(rx_bitrate_mbps) > 0:
+            links["link_mean_rx_bitrate_mbps"] = np.mean(rx_bitrate_mbps)
+            links["link_max_rx_bitrate_mbps"] = np.max(rx_bitrate_mbps)
+            links["link_min_rx_bitrate_mbps"] = np.min(rx_bitrate_mbps)
+            links["link_median_rx_bitrate_mbps"] = np.median(rx_bitrate_mbps)
+
+    # Print beacons
     for beacon in json_dict["beacons"]:
         primary_ch = int(beacon["channel"])
         primary_freq = int(float(
@@ -314,8 +374,25 @@ def get_scan_line(mac, json_dict):
             "link_margin_db": "NaN",
             "sta_count": "NaN",
             "ch_utilization": "NaN",
-            "available_admission_capacity_sec": "NaN"
+            "available_admission_capacity_sec": "NaN",
+            "link_mean_rssi_dbm": "NaN",
+            "link_max_rssi_dbm": "NaN",
+            "link_min_rssi_dbm": "NaN",
+            "link_median_rssi_dbm": "NaN",
+            "link_mean_tx_bitrate_mbps": "NaN",
+            "link_max_tx_bitrate_mbps": "NaN",
+            "link_min_tx_bitrate_mbps": "NaN",
+            "link_median_tx_bitrate_mbps": "NaN",
+            "link_mean_rx_bitrate_mbps": "NaN",
+            "link_max_rx_bitrate_mbps": "NaN",
+            "link_min_rx_bitrate_mbps": "NaN",
+            "link_median_rx_bitrate_mbps": "NaN"
         }
+
+        # Only update "link_*" attributes if the current beacon is connected.
+        if "connected" in beacon and beacon["connected"] is True:
+            for key in links:
+                outtemp[key] = links[key]
 
         he_element = [x for x in beacon["extras"]
                       if x["type"] == "HE Operation"]
@@ -490,7 +567,17 @@ def write(outarr, args):
                                "center_freq1_mhz", "bw_mhz", "amendment",
                                "connected", "tx_power_dbm", "link_margin_db",
                                "sta_count", "ch_utilization",
-                               "available_admission_capacity_sec"]
+                               "available_admission_capacity_sec",
+                               "link_mean_rssi_dbm", "link_max_rssi_dbm",
+                               "link_min_rssi_dbm", "link_median_rssi_dbm",
+                               "link_mean_tx_bitrate_mbps",
+                               "link_max_tx_bitrate_mbps",
+                               "link_min_tx_bitrate_mbps",
+                               "link_median_tx_bitrate_mbps",
+                               "link_mean_rx_bitrate_mbps",
+                               "link_max_rx_bitrate_mbps",
+                               "link_min_rx_bitrate_mbps",
+                               "link_median_rx_bitrate_mbps"]
 
         csv_writer = csv.DictWriter(
             args.output_file, fieldnames=fieldnames)

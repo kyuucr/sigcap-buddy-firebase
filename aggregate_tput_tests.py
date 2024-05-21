@@ -112,7 +112,13 @@ def create_csv(args):
         items=["active_wlan", "rssi_dbm", "primary_freq_mhz",
                "center_freq_mhz", "min_freq_mhz", "max_freq_mhz", "bw_mhz",
                "amendment", "tx_power_dbm", "link_margin_db", "sta_count",
-               "ch_utilization", "available_admission_capacity_sec"]),
+               "ch_utilization", "available_admission_capacity_sec",
+               "link_mean_rssi_dbm", "link_max_rssi_dbm", "link_min_rssi_dbm",
+               "link_median_rssi_dbm", "link_mean_tx_bitrate_mbps",
+               "link_max_tx_bitrate_mbps", "link_min_tx_bitrate_mbps",
+               "link_median_tx_bitrate_mbps", "link_mean_rx_bitrate_mbps",
+               "link_max_rx_bitrate_mbps", "link_min_rx_bitrate_mbps",
+               "link_median_rx_bitrate_mbps"]),
         on="test_uuid_concat")
     logging.info(combined)
 
