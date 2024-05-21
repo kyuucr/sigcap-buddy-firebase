@@ -194,7 +194,7 @@ def get_mac(heartbeats, mac_filter, rpi_ids):
 def list_devices(args):
     heartbeats = fetch_all()
     rpi_ids = None
-    if args.rpi_config:
+    if args.rpi_config.is_file():
         with open(args.rpi_config) as file:
             rpi_ids = json.load(file)
 
@@ -216,6 +216,7 @@ def parse(list_args=None):
     parser.add_argument("-d", "--log-dir", type=Path, default=Path("./logs"),
                         help="Specify local log directory, default='./logs'")
     parser.add_argument("--rpi-config", type=Path,
+                        default=Path("./.rpi-config.json"),
                         help="Specify RPI config file for RPI-ID translation")
     parser.add_argument("-l", "--log-level", default="warning",
                         help="Provide logging level, default is warning'")
