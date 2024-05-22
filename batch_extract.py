@@ -1,3 +1,4 @@
+import aggregate_tput_tests as agg_tput
 import argparse
 from datetime import datetime
 import json
@@ -72,6 +73,8 @@ def batch_extract(args):
                  "-o", str(args.outdir.joinpath(
                            "throughput_{}.csv".format(mac))),
                  "-l", args.log_level]))
+        else:
+            logging.warning(f"No throughput logs for {mac}! Skipping...")
 
         # 3.2. Write lat
         print(f"Writing latency CSV and JSON for {mac}...")
@@ -91,6 +94,8 @@ def batch_extract(args):
                  "-o", str(args.outdir.joinpath(
                            "latency_{}.csv".format(mac))),
                  "-l", args.log_level]))
+        else:
+            logging.warning(f"No latency logs for {mac}! Skipping...")
 
         # 3.3. Write wifi_scan
         print(f"Writing wifi scan CSV and JSON for {mac}...")
@@ -110,8 +115,29 @@ def batch_extract(args):
                  "-o", str(args.outdir.joinpath(
                            "wifi_scan_{}.csv".format(mac))),
                  "-l", args.log_level]))
+        else:
+            logging.warning(f"No Wi-Fi scan logs for {mac}! Skipping...")
 
-        # 3.4. Write heartbeats
+        # 3.4 Write aggregate throughput tests
+        print(f"Writing aggregate tput CSV and JSON for {mac}...")
+        if len(out_tput) > 0:
+            agg_tput_df = agg_tput.create_csv(out_tput, out_scan)
+            if (agg_tput_df is not None):
+                agg_tput.write(agg_tput_df, agg_tput.parse(
+                    [mac,
+                     "-J", "-o", str(args.outdir.joinpath(
+                                     f"agg_tput_{mac}.json")),
+                     "-l", args.log_level]))
+                agg_tput.write(agg_tput_df, agg_tput.parse(
+                    [mac,
+                     "-o", str(args.outdir.joinpath(f"agg_tput_{mac}.json")),
+                     "-l", args.log_level]))
+            else:
+                logging.warning(f"No aggregate tput for {mac}! Skipping...")
+        else:
+            logging.warning(f"No throughput logs for {mac}! Skipping...")
+
+        # 3.5. Write heartbeats
         out_hbeat = firebase_list_devices.get_mac(heartbeats, mac, rpi_ids)
         print(f"Writing heartbeat CSV and JSON for {mac}...")
         if (len(out_hbeat) > 0):
@@ -127,10 +153,15 @@ def batch_extract(args):
                     ["-m", mac, "-o", str(args.outdir.joinpath(
                         "heartbeat_{}.csv".format(mac))),
                      "-l", args.log_level]))
+        else:
+            logging.warning(f"No HB logs for {mac}! Skipping...")
 
-        # 3.5. Zip CSVs & JSONs
+        # 3.6. Zip CSVs & JSONs
         print(f"Compressing CSV and JSON files for {mac}...")
-        if (len(out_tput) > 0 or len(out_lat) > 0):
+        if (len(out_tput) > 0
+                or len(out_lat) > 0
+                or len(out_scan) > 0
+                or len(out_hbeat) > 0):
             cmd_out = subprocess.run(
                 ["zip", "-ur",
                  str(args.outdir.joinpath(
@@ -142,8 +173,10 @@ def batch_extract(args):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT).stdout.decode("utf-8")
             logging.info(cmd_out)
+        else:
+            logging.warning(f"No CSV or JSON files for {mac}! Skipping...")
 
-        # 3.6. Zip raw logs
+        # 3.7. Zip raw logs
         print(f"Compressing raw logs for {mac}...")
         if (args.log_dir.joinpath(mac).is_dir()):
             cmd_out = subprocess.run(
@@ -156,13 +189,13 @@ def batch_extract(args):
                 stderr=subprocess.STDOUT).stdout.decode("utf-8")
             logging.info(cmd_out)
 
-        # 3.7. Copy main program log
-        print(f"Copying main program log for {mac}...")
-        try:
-            copy(args.log_dir / mac / "speedtest_logger.log",
-                 args.outdir / f"speedtest_logger_{mac}.log")
-        except Exception as e:
-            logging.warning("Copy error: %s", e)
+        # 3.8. Copy main program log
+        # print(f"Copying main program log for {mac}...")
+        # try:
+        #     copy(args.log_dir / mac / "speedtest_logger.log",
+        #          args.outdir / f"speedtest_logger_{mac}.log")
+        # except Exception as e:
+        #     logging.warning("Copy error: %s", e)
 
     print("4. Compress all CSVs & JSONs")
     cmd_out = subprocess.run(
