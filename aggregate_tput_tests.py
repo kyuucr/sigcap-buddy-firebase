@@ -15,14 +15,52 @@ def mw_to_dbm(mw):
     return 10 * np.log10(mw)
 
 
-def create_csv(args):
-    # Get tput data
-    out_tput = pd.DataFrame.from_dict(write_csv.read_logs(write_csv.parse(
-        ["throughput",
-         "-d", str(args.log_dir),
-         "-m", args.mac,
-         "-l", args.log_level])))
+def write(df, args):
+    if args.json:
+        df.to_json(args.output_file, orient="split")
+    else:
+        df.to_csv(args.output_file)
+
+
+def join_overlap(df_main, df_scan, col_prefix, overlap_fun):
+    overlap_indices = overlap_fun(df_scan)
+    logging.info(df_scan[overlap_indices])
+    overlap_group = df_scan[overlap_indices].groupby(
+        "test_uuid_concat")["rssi_dbm"]
+
+    # Join with neighboring APs statistics
+    df_main = df_main.join(overlap_group.count().rename(
+        f"{col_prefix}_count"), on="test_uuid_concat")
+    df_main = df_main.join(overlap_group.apply(
+        lambda x: mw_to_dbm(dbm_to_mw(x).mean())).rename(
+            f"{col_prefix}_mean_rssi_dbm"),
+        on="test_uuid_concat")
+    # df_main = df_main.join(overlap_group.apply(
+    #     lambda x: mw_to_dbm(dbm_to_mw(x).std())).rename(
+    #     f"{col_prefix}_std_rssi_dbm"),
+    #     on="test_uuid_concat")
+    df_main = df_main.join(overlap_group.median().rename(
+        f"{col_prefix}_median_rssi_dbm"), on="test_uuid_concat")
+    df_main = df_main.join(
+        overlap_group.min().rename(
+            f"{col_prefix}_min_rssi_dbm"),
+        on="test_uuid_concat")
+    df_main = df_main.join(
+        overlap_group.max().rename(
+            f"{col_prefix}_max_rssi_dbm"),
+        on="test_uuid_concat")
+
+    return df_main
+
+
+def create_csv(tput_dict, wifi_scan_dict):
+    # Tput DF
+    out_tput = pd.DataFrame.from_dict(tput_dict)
     out_tput = out_tput[out_tput["test_uuid"] != "unknown"]
+    if (out_tput.shape[0] == 0):
+        logging.warning("Tput table empty after filtering!")
+        return
+
     out_tput = out_tput.rename(columns={"tput_mbps": "mean_tput_mbps"})
     out_tput["direction"] = out_tput["direction"].map(
         lambda x: "dl" if x == "downlink" else "ul")
@@ -41,20 +79,114 @@ def create_csv(args):
                 "min_tput_mbps", "max_tput_mbps", "median_tput_mbps"])
     combined.columns = ['_'.join(col) for col in combined.columns]
     # combined = combined[combined["mean_tput_mbps_wlan0"] > 0]
-    combined["timestamp_eth0"] = combined["timestamp_eth0"].fillna(
-        combined["timestamp_wlan0"])
-    combined["type_dir_eth0"] = combined["type_dir_eth0"].fillna(
-        combined["type_dir_wlan0"])
-    combined = combined.drop(["type_dir_wlan0", "timestamp_wlan0"], axis=1)
+    combined.insert(0, "timestamp", None)
+    combined.insert(1, "type", None)
+    if "timestamp_eth0" in combined:
+        combined["timestamp"] = combined["timestamp"].fillna(
+            combined["timestamp_eth0"])
+        combined["type"] = combined["type"].fillna(
+            combined["type_dir_eth0"])
+        combined = combined.drop(["type_dir_eth0", "timestamp_eth0"], axis=1)
+    if "timestamp_wlan0" in combined:
+        combined["timestamp"] = combined["timestamp"].fillna(
+            combined["timestamp_wlan0"])
+        combined["type"] = combined["type"].fillna(
+            combined["type_dir_wlan0"])
+        combined = combined.drop(["type_dir_wlan0", "timestamp_wlan0"], axis=1)
     if "timestamp_wlan1" in combined:
-        combined["timestamp_eth0"] = combined["timestamp_eth0"].fillna(
+        combined["timestamp"] = combined["timestamp"].fillna(
             combined["timestamp_wlan1"])
-        combined["type_dir_eth0"] = combined["type_dir_eth0"].fillna(
+        combined["type"] = combined["type"].fillna(
             combined["type_dir_wlan1"])
         combined = combined.drop(["type_dir_wlan1", "timestamp_wlan1"], axis=1)
-    combined = combined.rename(columns={"type_dir_eth0": "type",
-                                        "timestamp_eth0": "timestamp"})
     logging.info(combined)
+
+    raw_scan = [val for val in wifi_scan_dict if val["connected"] != "unknown"]
+    out_scan = pd.DataFrame.from_dict(raw_scan)
+    out_scan = out_scan[(out_scan["test_uuid"] != "unknown")
+                        & (out_scan["interface"] != "unknown")
+                        & (out_scan["corr_test"] != "idle")
+                        & (out_scan["corr_test"] != "none")]
+    out_scan = out_scan.rename(columns={"interface": "active_wlan"})
+    logging.info(out_scan)
+
+    if (out_scan.shape[0] > 0):
+        # Get center freq and min-max freq
+        out_scan["center_freq_mhz"] = out_scan["center_freq1_mhz"]
+        out_scan.loc[out_scan["center_freq_mhz"] == 0,
+                     "center_freq_mhz"] = out_scan["center_freq0_mhz"]
+        out_scan["min_freq_mhz"] = out_scan["center_freq_mhz"] - (
+            out_scan["bw_mhz"] / 2)
+        out_scan["max_freq_mhz"] = out_scan["center_freq_mhz"] + (
+            out_scan["bw_mhz"] / 2)
+        out_scan["primary_min_freq_mhz"] = out_scan["primary_freq_mhz"] - 10
+        out_scan["primary_max_freq_mhz"] = out_scan["primary_freq_mhz"] + 10
+
+        # Separate iperf and speedtest
+        out_scan_st_dl = out_scan[out_scan["corr_test"] == "speedtest"].copy()
+        out_scan_st_dl["corr_test"] = "speedtest-dl"
+        out_scan_st_ul = out_scan[out_scan["corr_test"] == "speedtest"].copy()
+        out_scan_st_ul["corr_test"] = "speedtest-ul"
+        out_scan_ip = out_scan[out_scan["corr_test"] != "speedtest"].copy()
+        out_scan = pd.concat([out_scan_ip,
+                              out_scan_st_dl,
+                              out_scan_st_ul], ignore_index=True)
+        out_scan["test_uuid_concat"] = out_scan[[
+            "test_uuid", "corr_test"]].apply(lambda x: '-'.join(x), axis=1)
+        out_scan = out_scan.set_index("test_uuid_concat")
+        logging.info(out_scan.index)
+
+        # Join tput with connected AP
+        combined = combined.join(out_scan[out_scan["connected"]].filter(
+            items=["active_wlan", "rssi_dbm", "primary_freq_mhz",
+                   "center_freq_mhz", "min_freq_mhz", "max_freq_mhz", "bw_mhz",
+                   "amendment", "tx_power_dbm", "link_margin_db", "sta_count",
+                   "ch_utilization", "available_admission_capacity_sec",
+                   "link_mean_rssi_dbm", "link_max_rssi_dbm",
+                   "link_min_rssi_dbm", "link_median_rssi_dbm",
+                   "link_mean_tx_bitrate_mbps", "link_max_tx_bitrate_mbps",
+                   "link_min_tx_bitrate_mbps", "link_median_tx_bitrate_mbps",
+                   "link_mean_rx_bitrate_mbps", "link_max_rx_bitrate_mbps",
+                   "link_min_rx_bitrate_mbps", "link_median_rx_bitrate_mbps"]),
+            on="test_uuid_concat")
+        logging.info(combined)
+
+        # Get the overlap of connected and neighboring APs
+        out_scan_overlap = out_scan[~out_scan["connected"]].join(
+            out_scan[out_scan["connected"]],
+            on="test_uuid_concat",
+            rsuffix='_conn')
+
+        combined = join_overlap(
+            combined, out_scan_overlap, "overlap_full",
+            lambda x: ((x["min_freq_mhz_conn"]
+                        <= x["max_freq_mhz"])
+                       & (x["min_freq_mhz"]
+                          <= x["max_freq_mhz_conn"])))
+
+        combined = join_overlap(
+            combined, out_scan_overlap, "overlap_primary",
+            lambda x: ((x["primary_min_freq_mhz_conn"]
+                        <= x["primary_max_freq_mhz"])
+                       & (x["primary_min_freq_mhz"]
+                          <= x["primary_max_freq_mhz_conn"])))
+
+    combined = combined.sort_values("timestamp")
+    logging.info(combined)
+
+    return combined
+
+
+def agg_tput(args):
+    # Get tput data
+    raw_tput = write_csv.read_logs(write_csv.parse(
+        ["throughput",
+         "-d", str(args.log_dir),
+         "-m", args.mac,
+         "-l", args.log_level]))
+    if len(raw_tput) == 0:
+        logging.warning("No throughput logs! Exiting...")
+        return
 
     # Get scan data
     raw_scan = write_csv.read_logs(write_csv.parse(
@@ -62,94 +194,10 @@ def create_csv(args):
          "-d", str(args.log_dir),
          "-m", args.mac,
          "-l", args.log_level]))
-    raw_scan = [val for val in raw_scan if val["connected"] != "unknown"]
-    out_scan = pd.DataFrame.from_dict(raw_scan)
-    out_scan = out_scan[(out_scan["test_uuid"] != "unknown")
-                        & (out_scan["interface"] != "unknown")
-                        & (out_scan["corr_test"] != "idle")
-                        & (out_scan["corr_test"] != "none")]
-    out_scan = out_scan.rename(columns={"interface": "active_wlan"})
 
-    # Get center freq and min-max freq
-    out_scan["center_freq_mhz"] = out_scan["center_freq1_mhz"]
-    out_scan.loc[out_scan["center_freq_mhz"] == 0,
-                 "center_freq_mhz"] = out_scan["center_freq0_mhz"]
-    out_scan["min_freq_mhz"] = out_scan["center_freq_mhz"] - (
-        out_scan["bw_mhz"] / 2)
-    out_scan["max_freq_mhz"] = out_scan["center_freq_mhz"] + (
-        out_scan["bw_mhz"] / 2)
-    logging.info(out_scan["max_freq_mhz"])
-
-    # Separate iperf and speedtest
-    out_scan_st_dl = out_scan[out_scan["corr_test"] == "speedtest"].copy()
-    out_scan_st_dl["corr_test"] = "speedtest-dl"
-    out_scan_st_ul = out_scan[out_scan["corr_test"] == "speedtest"].copy()
-    out_scan_st_ul["corr_test"] = "speedtest-ul"
-    out_scan_ip = out_scan[out_scan["corr_test"] != "speedtest"].copy()
-    out_scan = pd.concat([out_scan_ip,
-                          out_scan_st_dl,
-                          out_scan_st_ul], ignore_index=True)
-    out_scan["test_uuid_concat"] = out_scan[[
-        "test_uuid", "corr_test"]].apply(lambda x: '-'.join(x), axis=1)
-    out_scan = out_scan.set_index("test_uuid_concat")
-    logging.info(out_scan.index)
-
-    # Get the overlap of connected and neighboring APs
-    out_scan_overlap = out_scan[~out_scan["connected"]].join(
-        out_scan[out_scan["connected"]],
-        on="test_uuid_concat",
-        rsuffix='_conn')
-    overlap_indices = ((out_scan_overlap["min_freq_mhz_conn"]
-                        <= out_scan_overlap["max_freq_mhz"])
-                       & (out_scan_overlap["min_freq_mhz"]
-                          <= out_scan_overlap["max_freq_mhz_conn"]))
-    logging.info(out_scan_overlap[overlap_indices])
-    overlap_group = out_scan_overlap[overlap_indices].groupby(
-        "test_uuid_concat")["rssi_dbm"]
-
-    # Join tput with connected AP
-    combined = combined.join(out_scan[out_scan["connected"]].filter(
-        items=["active_wlan", "rssi_dbm", "primary_freq_mhz",
-               "center_freq_mhz", "min_freq_mhz", "max_freq_mhz", "bw_mhz",
-               "amendment", "tx_power_dbm", "link_margin_db", "sta_count",
-               "ch_utilization", "available_admission_capacity_sec",
-               "link_mean_rssi_dbm", "link_max_rssi_dbm", "link_min_rssi_dbm",
-               "link_median_rssi_dbm", "link_mean_tx_bitrate_mbps",
-               "link_max_tx_bitrate_mbps", "link_min_tx_bitrate_mbps",
-               "link_median_tx_bitrate_mbps", "link_mean_rx_bitrate_mbps",
-               "link_max_rx_bitrate_mbps", "link_min_rx_bitrate_mbps",
-               "link_median_rx_bitrate_mbps"]),
-        on="test_uuid_concat")
-    logging.info(combined)
-
-    # Join with neighboring APs statistics
-    combined = combined.join(overlap_group.count().rename("neighbor_count"),
-                             on="test_uuid_concat")
-    combined = combined.join(overlap_group.apply(
-        lambda x: mw_to_dbm(dbm_to_mw(x).mean())).rename(
-            "neighbor_mean_rssi_dbm"),
-        on="test_uuid_concat")
-    # combined = combined.join(overlap_group.apply(
-    #     lambda x: mw_to_dbm(dbm_to_mw(x).std())).rename(
-    #     "neighbor_std_rssi_dbm"),
-    #     on="test_uuid_concat")
-    combined = combined.join(overlap_group.median().rename(
-        "neighbor_median_rssi_dbm"), on="test_uuid_concat")
-    combined = combined.join(
-        overlap_group.min().rename(
-            "neighbor_min_rssi_dbm"),
-        on="test_uuid_concat")
-    combined = combined.join(
-        overlap_group.max().rename(
-            "neighbor_max_rssi_dbm"),
-        on="test_uuid_concat")
-    combined = combined.sort_values("timestamp")
-    logging.info(combined)
-
-    if args.json:
-        combined.to_json(args.output_file, orient="split")
-    else:
-        combined.to_csv(args.output_file)
+    out_df = create_csv(raw_tput, raw_scan)
+    if (out_df is not None):
+        write(out_df, args)
 
 
 def parse(list_args=None):
@@ -175,4 +223,4 @@ if __name__ == '__main__':
     args = parse()
     logging.basicConfig(level=args.log_level.upper())
     logging.info(f"MAC: {args.mac}")
-    create_csv(args)
+    agg_tput(args)
