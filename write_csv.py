@@ -318,34 +318,41 @@ def get_scan_line(mac, json_dict):
         "link_median_rx_bitrate_mbps": "NaN"
     }
     if "links" in json_dict:
-        rssi_dbm = [re_dbm.findall(val["rssi"]) for val in json_dict["links"]]
-        rssi_dbm = np.array([int(val[0]) for val in rssi_dbm if len(val) > 0])
-        if len(rssi_dbm) > 0:
-            links["link_mean_rssi_dbm"] = mw_to_dbm(np.mean(dbm_to_mw(
-                rssi_dbm)))
-            links["link_max_rssi_dbm"] = np.max(rssi_dbm)
-            links["link_min_rssi_dbm"] = np.min(rssi_dbm)
-            links["link_median_rssi_dbm"] = np.median(rssi_dbm)
+        if "rssi" in json_dict["links"]:
+            rssi_dbm = [re_dbm.findall(val["rssi"])
+                        for val in json_dict["links"]]
+            rssi_dbm = np.array([int(val[0]) for val in rssi_dbm
+                                 if len(val) > 0])
+            if len(rssi_dbm) > 0:
+                links["link_mean_rssi_dbm"] = mw_to_dbm(np.mean(dbm_to_mw(
+                    rssi_dbm)))
+                links["link_max_rssi_dbm"] = np.max(rssi_dbm)
+                links["link_min_rssi_dbm"] = np.min(rssi_dbm)
+                links["link_median_rssi_dbm"] = np.median(rssi_dbm)
 
-        tx_bitrate_mbps = [re_mbps.findall(val["tx_bitrate"])
-                           for val in json_dict["links"]]
-        tx_bitrate_mbps = [float(val[0]) for val in tx_bitrate_mbps
-                           if len(val) > 0]
-        if len(tx_bitrate_mbps) > 0:
-            links["link_mean_tx_bitrate_mbps"] = np.mean(tx_bitrate_mbps)
-            links["link_max_tx_bitrate_mbps"] = np.max(tx_bitrate_mbps)
-            links["link_min_tx_bitrate_mbps"] = np.min(tx_bitrate_mbps)
-            links["link_median_tx_bitrate_mbps"] = np.median(tx_bitrate_mbps)
+        if "tx_bitrate" in json_dict["links"]:
+            tx_bitrate_mbps = [re_mbps.findall(val["tx_bitrate"])
+                               for val in json_dict["links"]]
+            tx_bitrate_mbps = [float(val[0]) for val in tx_bitrate_mbps
+                               if len(val) > 0]
+            if len(tx_bitrate_mbps) > 0:
+                links["link_mean_tx_bitrate_mbps"] = np.mean(tx_bitrate_mbps)
+                links["link_max_tx_bitrate_mbps"] = np.max(tx_bitrate_mbps)
+                links["link_min_tx_bitrate_mbps"] = np.min(tx_bitrate_mbps)
+                links["link_median_tx_bitrate_mbps"] = np.median(
+                    tx_bitrate_mbps)
 
-        rx_bitrate_mbps = [re_mbps.findall(val["rx_bitrate"])
-                           for val in json_dict["links"]]
-        rx_bitrate_mbps = [float(val[0]) for val in rx_bitrate_mbps
-                           if len(val) > 0]
-        if len(rx_bitrate_mbps) > 0:
-            links["link_mean_rx_bitrate_mbps"] = np.mean(rx_bitrate_mbps)
-            links["link_max_rx_bitrate_mbps"] = np.max(rx_bitrate_mbps)
-            links["link_min_rx_bitrate_mbps"] = np.min(rx_bitrate_mbps)
-            links["link_median_rx_bitrate_mbps"] = np.median(rx_bitrate_mbps)
+        if "rx_bitrate" in json_dict["links"]:
+            rx_bitrate_mbps = [re_mbps.findall(val["rx_bitrate"])
+                               for val in json_dict["links"]]
+            rx_bitrate_mbps = [float(val[0]) for val in rx_bitrate_mbps
+                               if len(val) > 0]
+            if len(rx_bitrate_mbps) > 0:
+                links["link_mean_rx_bitrate_mbps"] = np.mean(rx_bitrate_mbps)
+                links["link_max_rx_bitrate_mbps"] = np.max(rx_bitrate_mbps)
+                links["link_min_rx_bitrate_mbps"] = np.min(rx_bitrate_mbps)
+                links["link_median_rx_bitrate_mbps"] = np.median(
+                    rx_bitrate_mbps)
 
     # Print beacons
     for beacon in json_dict["beacons"]:
