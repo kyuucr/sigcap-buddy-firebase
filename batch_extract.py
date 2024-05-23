@@ -238,7 +238,7 @@ def parse(list_args=None):
                         help="Specify output directory.")
     parser.add_argument("-d", "--log-dir", type=Path, default=Path("./logs"),
                         help="Specify local log directory, default='./logs'")
-    parser.add_argument("-p", "--num-parallel", default=8,
+    parser.add_argument("-p", "--num-parallel", type=int, default=8,
                         help="Specify number of parallel processes, default=8")
     parser.add_argument("--rsync", action="store_true",
                         help="Use rsync to server instead of Firebase")
