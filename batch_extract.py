@@ -163,8 +163,20 @@ def batch_extract():
         with open(rpi_config) as file:
             rpi_ids = json.load(file)
 
+    last_update = None
+    last_update_file = args.outdir.joinpath("last_update.json")
+    if last_update_file.is_file():
+        with open(args.outdir.joinpath("last_update.json"), "r") as fd:
+            last_update = json.load(fd)["last_update"]
+            print(f"Got last update: {last_update}")
+
     print("1. Download and zip all logs")
-    firebase_download.download(args)
+    download_args = []
+    if last_update:
+        download_args += ["--start-date", last_update]
+    if args.rsync:
+        download_args += ["--rsync"]
+    firebase_download.download(firebase_download.parse(download_args))
     print("Zipping all logs...")
     cmd_out = subprocess.run(
         ["zip", "-ur",
@@ -227,7 +239,7 @@ def parse(list_args=None):
     parser.add_argument("-d", "--log-dir", type=Path, default=Path("./logs"),
                         help="Specify local log directory, default='./logs'")
     parser.add_argument("-p", "--num-parallel", default=8,
-                        help="Specify local log directory, default='./logs'")
+                        help="Specify number of parallel processes, default=8")
     parser.add_argument("--rsync", action="store_true",
                         help="Use rsync to server instead of Firebase")
     parser.add_argument("-l", "--log-level", default="warning",
