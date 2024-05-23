@@ -1,6 +1,7 @@
 import argparse
 from base64 import b64decode
 from crc32c import crc32c
+from datetime import datetime, timedelta, timezone
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import storage
@@ -29,10 +30,46 @@ def download_firebase(args):
     logging.info("Got bucket: %s", bucket.name)
 
     # List files to download
-    all_files = [{
-        "name": file.name,
-        "crc32c": file.crc32c
-    } for file in bucket.list_blobs()]
+    all_files = list()
+    if args.start_date:
+        # List files from start_date, if it is set
+        now = datetime.now(timezone.utc).astimezone()
+        start_time = args.start_date
+        # Make start_time offset-aware
+        if (start_time.tzinfo is None
+                or start_time.tzinfo.utcoffset(start_time) is None):
+            start_time = start_time.astimezone()
+        # Start from one day prior, just to be sure
+        start_time -= timedelta(days=1)
+        while start_time < now:
+            glob_str = f"*/*/{start_time.date().isoformat()}*"
+            logging.info(f"glob_str={glob_str}")
+            start_time += timedelta(days=1)
+            iter_blobs = bucket.list_blobs(
+                fields="items(name,crc32c),nextPageToken",
+                match_glob=glob_str)
+            all_files += [{
+                "name": file.name,
+                "crc32c": file.crc32c
+            } for file in iter_blobs]
+        # List log files
+        iter_blobs = bucket.list_blobs(
+            fields="items(name,crc32c),nextPageToken",
+            match_glob="*/*.log.*")
+        all_files += [{
+            "name": file.name,
+            "crc32c": file.crc32c
+        } for file in iter_blobs]
+    else:
+        # List all files, takes longer
+        iter_blobs = bucket.list_blobs(
+            fields="items(name,crc32c),nextPageToken")
+        all_files += [{
+            "name": file.name,
+            "crc32c": file.crc32c
+        } for file in iter_blobs]
+    logging.info(f"Total # of files: {len(all_files)}")
+
     to_download = list(filter(
         lambda x: not logdir.joinpath(x["name"]).exists()
         or (x["name"].endswith("speedtest_logger.log")
@@ -96,6 +133,11 @@ def parse(list_args=None):
                         help="Use rsync to server instead of Firebase")
     parser.add_argument("-d", "--log-dir", type=Path, default=Path("./logs"),
                         help="Specify local log directory, default='./logs'")
+    parser.add_argument("-s", "--start-date",
+                        type=lambda s: datetime.fromisoformat(s),
+                        help=("Specify the start date from which the files "
+                              "will be downloaded. Use ISO format, ex: "
+                              "2024-05-22"))
     parser.add_argument("-l", "--log-level", default="warning",
                         help="Provide logging level, default is warning'")
     if (list_args is None):
