@@ -50,6 +50,7 @@ def get_last_tests(mac, log_dir, now_timestamp):
         "eth": None,
         "wla": None
     }
+    search_thr = 93600  # File search threshold: 26 hours
 
     # Check speedtest first since speedtest runs last
     speedtest_dir = log_dir.joinpath(mac, "speedtest-log")
@@ -78,7 +79,7 @@ def get_last_tests(mac, log_dir, now_timestamp):
         # Exit if output is assigned for all interfaces
         # or the log timestamp is more than a day
         if ((output["eth"] is not None and output["wla"] is not None)
-                or (now_timestamp - time).total_seconds() > 86400):
+                or (now_timestamp - time).total_seconds() > search_thr):
             logging.info("Exiting log file reads, output: %s, time diff %ds",
                          output, (now_timestamp - time).total_seconds())
             break
@@ -112,7 +113,7 @@ def get_last_tests(mac, log_dir, now_timestamp):
             # Exit if output is assigned for all interfaces
             # or the log timestamp is more than a day
             if ((output["eth"] is not None and output["wla"] is not None)
-                    or (now_timestamp - time).total_seconds() > 86400):
+                    or (now_timestamp - time).total_seconds() > search_thr):
                 logging.info(("Exiting log file reads, output: %s, "
                               "time diff %ds"),
                              output, (now_timestamp - time).total_seconds())
