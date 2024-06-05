@@ -17,7 +17,8 @@ def write(outarr, args):
         fieldnames = []
         if (args.mac == "disabled"):
             fieldnames += ["mac", "rpi_id", "online", "start_timestamp",
-                           "last_timestamp", "last_test_eth", "last_test_wlan"]
+                           "last_timestamp", "last_test_eth", "last_test_wlan",
+                           "data_used_gbytes"]
         else:
             fieldnames += ["mac", "rpi_id", "online", "start_timestamp",
                            "last_timestamp"]
@@ -30,6 +31,10 @@ def write(outarr, args):
 
 def fetch_all():
     return db.reference("hb_append").get()
+
+
+def fetch_data_used():
+    return db.reference("data_used").get()
 
 
 def read_json(file):
@@ -149,6 +154,7 @@ def get_list(heartbeats, log_dir, rpi_ids):
     now_timestamp = datetime.now(timezone.utc).astimezone()
     logging.info("Current time: %s",
                  now_timestamp.isoformat(timespec="seconds"))
+    data_used = fetch_data_used()
 
     for mac in heartbeats:
         heartbeats[mac] = {key: value for key, value in heartbeats[mac].items()
@@ -163,6 +169,16 @@ def get_list(heartbeats, log_dir, rpi_ids):
         if online:
             last_tests = get_last_tests(mac, log_dir, now_timestamp)
         logging.debug(mac, last)
+
+        # Data used
+        data_used_gb = "NaN"
+        if mac in data_used:
+            temp = {key: value for key, value in data_used[mac].items()
+                    if isinstance(value, dict)}
+            data_used_gb = sorted(list(temp.values()),
+                                  key=lambda x: x["last_timestamp"],
+                                  reverse=True)[0]["data_used_gbytes"]
+
         outarr.append({
             "mac": mac,
             "rpi_id": get_rpi_id(rpi_ids, mac),
@@ -170,7 +186,8 @@ def get_list(heartbeats, log_dir, rpi_ids):
             "start_timestamp": last["start_timestamp"],
             "last_timestamp": last["last_timestamp"],
             "last_test_eth": last_tests["eth"],
-            "last_test_wlan": last_tests["wla"]})
+            "last_test_wlan": last_tests["wla"],
+            "data_used_gbytes": data_used_gb})
 
     return sorted(outarr, key=lambda x: (~x["online"], x["rpi_id"], x["mac"]))
 
