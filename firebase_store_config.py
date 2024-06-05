@@ -19,7 +19,12 @@ default_config = {
     "iperf_minport": 5201,
     "iperf_maxport": 5220,
     "iperf_duration": 5,
-    "timeout_s": 120
+    "timeout_s": 120,
+    "data_cap_gbytes": 100,
+    "sampling_threshold": 0.25,
+    "broker_addr": "ns-mn1.cse.nd.edu",
+    "broker_port": 1883,
+    "publish_interval": 600
 }
 
 helper_dict = {
@@ -32,7 +37,12 @@ helper_dict = {
     "iperf_minport": "Minimum port for iperf",
     "iperf_maxport": "Maximum port for iperf",
     "iperf_duration": "iperf duration in seconds",
-    "timeout_s": "Command timeout in seconds"
+    "timeout_s": "Command timeout in seconds",
+    "data_cap_gbytes": "Data cap in GBytes",
+    "sampling_threshold": "Testing samping threshold [0, 1]",
+    "broker_addr": "MQTT broker address",
+    "broker_port": "MQTT broker port",
+    "publish_interval": "MQTT status publish interval in seconds"
 }
 
 
