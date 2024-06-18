@@ -15,17 +15,23 @@ import write_csv
 
 args = None
 rpi_ids = None
+rpi_start_time = dict()
 heartbeats = None
 
 
 def process_mac(mac):
+    global rpi_start_time
+    agg_tput_df = None
+
     # 3.1. Write tput
     print(f"Writing throughput CSV and JSON for {mac}...")
-    out_tput = write_csv.read_logs(write_csv.parse(
-        ["throughput",
-         "-d", str(args.log_dir),
-         "-m", mac,
-         "-l", args.log_level]))
+    params = ["throughput",
+              "-d", str(args.log_dir),
+              "-m", mac,
+              "-l", args.log_level]
+    if mac in rpi_start_time and rpi_start_time[mac]:
+        params += ["--start-time", rpi_start_time[mac]]
+    out_tput = write_csv.read_logs(write_csv.parse(params))
     if (len(out_tput) > 0):
         write_csv.write(out_tput, write_csv.parse(
             ["throughput", "-J",
@@ -42,11 +48,13 @@ def process_mac(mac):
 
     # 3.2. Write lat
     print(f"Writing latency CSV and JSON for {mac}...")
-    out_lat = write_csv.read_logs(write_csv.parse(
-        ["latency",
-         "-d", str(args.log_dir),
-         "-m", mac,
-         "-l", args.log_level]))
+    params = ["latency",
+              "-d", str(args.log_dir),
+              "-m", mac,
+              "-l", args.log_level]
+    if mac in rpi_start_time and rpi_start_time[mac]:
+        params += ["--start-time", rpi_start_time[mac]]
+    out_lat = write_csv.read_logs(write_csv.parse(params))
     if (len(out_lat) > 0):
         write_csv.write(out_lat, write_csv.parse(
             ["latency", "-J",
@@ -63,11 +71,13 @@ def process_mac(mac):
 
     # 3.3. Write wifi_scan
     print(f"Writing wifi scan CSV and JSON for {mac}...")
-    out_scan = write_csv.read_logs(write_csv.parse(
-        ["wifi_scan",
-         "-d", str(args.log_dir),
-         "-m", mac,
-         "-l", args.log_level]))
+    params = ["wifi_scan",
+              "-d", str(args.log_dir),
+              "-m", mac,
+              "-l", args.log_level]
+    if mac in rpi_start_time and rpi_start_time[mac]:
+        params += ["--start-time", rpi_start_time[mac]]
+    out_scan = write_csv.read_logs(write_csv.parse(params))
     if (len(out_scan) > 0):
         write_csv.write(out_scan, write_csv.parse(
             ["wifi_scan", "-J",
@@ -156,12 +166,18 @@ def process_mac(mac):
 
 def batch_extract():
     # Setup
-    global rpi_ids, heartbeats
+    global rpi_ids, rpi_start_time, heartbeats
     logging.basicConfig(level=args.log_level.upper())
     rpi_config = Path(".rpi-config.json")
     if rpi_config.is_file():
         with open(rpi_config) as file:
             rpi_ids = json.load(file)
+    rpi_time_file = Path(".rpi-start-time.json")
+    if rpi_ids is not None and rpi_time_file.is_file():
+        with open(rpi_time_file) as file:
+            temp = json.load(file)
+            for key, val in temp.items():
+                rpi_start_time[rpi_ids[key]] = val
 
     last_update = None
     last_update_file = args.outdir.joinpath("last_update.json")
