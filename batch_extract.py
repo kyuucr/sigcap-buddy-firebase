@@ -1,4 +1,5 @@
 import aggregate_tput_tests as agg_tput
+import tput_data_stats
 import argparse
 from datetime import datetime
 import json
@@ -163,6 +164,11 @@ def process_mac(mac):
             stderr=subprocess.STDOUT).stdout.decode("utf-8")
         logging.info(cmd_out)
 
+    return {
+        "mac": mac,
+        "agg_tput_df": agg_tput_df
+    }
+
 
 def batch_extract():
     # Setup
@@ -202,34 +208,46 @@ def batch_extract():
         stderr=subprocess.STDOUT).stdout.decode("utf-8")
     logging.info(cmd_out)
 
-    print("2. Download and write device states")
+    print("2. Download device states")
     heartbeats = firebase_list_devices.fetch_all()
-    list_devices = firebase_list_devices.get_list(heartbeats,
-                                                  args.log_dir,
-                                                  rpi_ids)
-    macs = [entry["mac"] for entry in list_devices]
+    device_list = firebase_list_devices.get_list(heartbeats,
+                                                 args.log_dir,
+                                                 rpi_ids)
+    macs = [entry["mac"] for entry in device_list]
     logging.info(macs)
-    # 2.1 Write as JSON
-    firebase_list_devices.write(
-        list_devices,
-        firebase_list_devices.parse(
-            ["-J", "-o", str(args.outdir.joinpath("device_list.json")),
-             "-l", args.log_level]))
-    # 2.2 Write as CSV
-    firebase_list_devices.write(
-        list_devices,
-        firebase_list_devices.parse(
-            ["-o", str(args.outdir.joinpath("device_list.csv")),
-             "-l", args.log_level]))
+    # Write device states later after it got throughput stats
 
     print("3. Write CSV and JSON for each MAC")
+    agg_tput_data = list()
     if args.num_parallel > 1:
         print(f"Running {args.num_parallel} parallel processes, log texts "
               "may be unordered.")
-    with Pool(args.num_parallel) as p:
-        p.map(process_mac, macs)
+        with Pool(args.num_parallel) as p:
+            agg_tput_data = p.map(process_mac, macs)
+    else:
+        for mac in macs:
+            agg_tput_data += [process_mac(mac)]
 
-    print("4. Compress all CSVs & JSONs")
+    print("4. Combine device states with data stats and write it")
+    agg_tput_data = {x["mac"]: x["agg_tput_df"] for x in agg_tput_data
+                     if x["agg_tput_df"] is not None}
+    device_list = tput_data_stats.combine_device_list(
+        device_list, agg_tput_data, remove_empty=True)
+    # 4.1 Write as JSON
+    tput_data_stats.write(
+        device_list,
+        tput_data_stats.parse(
+            ["all", "-J", "-o", str(args.outdir.joinpath("device_list.json")),
+             "-l", args.log_level]),
+        as_records=True)
+    # 4.2 Write as CSV
+    tput_data_stats.write(
+        device_list,
+        tput_data_stats.parse(
+            ["all", "-o", str(args.outdir.joinpath("device_list.csv")),
+             "-l", args.log_level]))
+
+    print("5. Compress all CSVs & JSONs")
     cmd_out = subprocess.run(
         ["zip", "-ur",
          str(args.outdir.joinpath("all_data.zip").resolve()),
@@ -239,7 +257,7 @@ def batch_extract():
         stderr=subprocess.STDOUT).stdout.decode("utf-8")
     logging.info(cmd_out)
 
-    print("5. Write last update JSON")
+    print("6. Write last update JSON")
     with open(args.outdir.joinpath("last_update.json"), "w") as fd:
         fd.write(json.dumps({
             "last_update": datetime.now().astimezone().isoformat(
