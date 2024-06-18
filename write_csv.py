@@ -235,7 +235,7 @@ def get_lat_line(mac, json_dict):
                         lambda x: x["time_ms"] if "time_ms" in x else "NaN",
                         entry["responses"]))
                     latencies_ms = [lat for lat in latencies_ms
-                                    if lat != "NaN"]
+                                    if lat != "NaN" and lat is not None]
                     lat_median = ("NaN" if len(latencies_ms) == 0
                                   else np.median(latencies_ms))
                     outarr.append({
@@ -616,7 +616,7 @@ def read_logs(args):
         case _:
             logging.warning("Unknown mode: %s", args.mode)
 
-    logging.info(files)
+    logging.debug(files)
 
     outarr = list()
 
@@ -630,10 +630,15 @@ def read_logs(args):
                 logging.debug("Cannot parse file %s as JSON, reason=%s",
                               file, err)
             else:
-                outarr += get_line(
+                curr_line = get_line(
                     args.mode,
                     file.parts[1],
                     json_dict)
+                if len(curr_line) > 0 and (
+                    (args.start_time is None)
+                    or (args.start_time < datetime.fromisoformat(
+                        curr_line[0]["timestamp"]))):
+                    outarr += curr_line
 
     return outarr
 
@@ -645,7 +650,11 @@ def parse(list_args=None):
     parser.add_argument("-J", "--json", action="store_true",
                         help="Output as JSON.")
     parser.add_argument("-m", "--mac", nargs='+',
-                        help="Filter data to the speficied MAC address'")
+                        help="Filter data to the speficied MAC address.")
+    parser.add_argument("--start-time", nargs='?',
+                        type=(lambda x: datetime.fromisoformat(x)),
+                        help=("Filter data to the speficied start time (must "
+                              "be in ISO format, ex: 2024-06-14T17:00-0500)"))
     parser.add_argument("-o", "--output-file", nargs='?',
                         type=argparse.FileType('w'), default=sys.stdout,
                         help="Output result to file, default is to stdout'")
