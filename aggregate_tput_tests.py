@@ -53,7 +53,7 @@ def join_overlap(df_main, df_scan, col_prefix, overlap_fun):
     return df_main
 
 
-def create_csv(tput_dict, wifi_scan_dict):
+def create_tput_df(tput_dict):
     # Tput DF
     out_tput = pd.DataFrame.from_dict(tput_dict)
     out_tput = out_tput[out_tput["test_uuid"] != "unknown"]
@@ -101,8 +101,20 @@ def create_csv(tput_dict, wifi_scan_dict):
         combined = combined.drop(["type_dir_wlan1", "timestamp_wlan1"], axis=1)
     logging.info(combined)
 
+    return combined
+
+
+def create_csv(tput_dict, wifi_scan_dict):
+    combined = create_tput_df(tput_dict)
+    if combined is None:
+        return
+
     raw_scan = [val for val in wifi_scan_dict if val["connected"] != "unknown"]
     out_scan = pd.DataFrame.from_dict(raw_scan)
+    if ("test_uuid" not in out_scan.columns
+            or "interface" not in out_scan.columns
+            or "corr_test" not in out_scan.columns):
+        return
     out_scan = out_scan[(out_scan["test_uuid"] != "unknown")
                         & (out_scan["interface"] != "unknown")
                         & (out_scan["corr_test"] != "idle")
@@ -179,21 +191,25 @@ def create_csv(tput_dict, wifi_scan_dict):
 
 def agg_tput(args):
     # Get tput data
-    raw_tput = write_csv.read_logs(write_csv.parse(
-        ["throughput",
-         "-d", str(args.log_dir),
-         "-m", args.mac,
-         "-l", args.log_level]))
+    params = ["throughput",
+              "-d", str(args.log_dir),
+              "-m", args.mac,
+              "-l", args.log_level]
+    if args.start_time:
+        params += ["--start-time", args.start_time]
+    raw_tput = write_csv.read_logs(write_csv.parse(params))
     if len(raw_tput) == 0:
         logging.warning("No throughput logs! Exiting...")
         return
 
     # Get scan data
-    raw_scan = write_csv.read_logs(write_csv.parse(
-        ["wifi_scan",
-         "-d", str(args.log_dir),
-         "-m", args.mac,
-         "-l", args.log_level]))
+    params = ["wifi_scan",
+              "-d", str(args.log_dir),
+              "-m", args.mac,
+              "-l", args.log_level]
+    if args.start_time:
+        params += ["--start-time", args.start_time]
+    raw_scan = write_csv.read_logs(write_csv.parse(params))
 
     out_df = create_csv(raw_tput, raw_scan)
     if (out_df is not None):
@@ -204,6 +220,9 @@ def parse(list_args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("mac", type=str,
                         help="Specify MAC address.")
+    parser.add_argument("--start-time", nargs='?',
+                        help=("Filter data to the speficied start time (must "
+                              "be in ISO format, ex: 2024-06-14T17:00-0500)"))
     parser.add_argument("-J", "--json", action="store_true",
                         help="Output as JSON.")
     parser.add_argument("-o", "--output-file", nargs='?',
