@@ -105,7 +105,7 @@ def process_mac(mac):
                  "-l", args.log_level]))
             agg_tput.write(agg_tput_df, agg_tput.parse(
                 [mac,
-                 "-o", str(args.outdir.joinpath(f"agg_tput_{mac}.json")),
+                 "-o", str(args.outdir.joinpath(f"agg_tput_{mac}.csv")),
                  "-l", args.log_level]))
         else:
             logging.warning(f"No aggregate tput for {mac}! Skipping...")
