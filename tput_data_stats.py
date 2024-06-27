@@ -24,6 +24,10 @@ def create_csv(agg_tput_df, by_direction=False):
         agg_tput_df["timestamp"], utc=True)
     agg_tput_df["timestamp_hour"] = agg_tput_df["timestamp"].apply(
         lambda x: x.hour)
+    agg_tput_df["timestamp_date"] = agg_tput_df["timestamp"].apply(
+        lambda x: str(x.date()))
+    agg_tput_df["timestamp_dow"] = agg_tput_df["timestamp"].apply(
+        lambda x: x.weekday())
     if by_direction:
         agg_tput_df["direction"] = agg_tput_df["type"].apply(
             lambda x: x.split("-")[1])
@@ -37,8 +41,10 @@ def create_csv(agg_tput_df, by_direction=False):
     # or by direction {dl,ul}
     if by_direction:
         focus_cols = ["direction"]
+        focus_col = "direction"
     else:
         focus_cols = ["type"]
+        focus_col = "type"
     if has_eth0:
         focus_cols += ["max_tput_mbps_eth0"]
     if has_wlan0:
@@ -46,27 +52,18 @@ def create_csv(agg_tput_df, by_direction=False):
     if has_wlan1:
         focus_cols += ["max_tput_mbps_wlan1"]
     if by_direction:
-        all_tput = agg_tput_df[focus_cols].groupby("direction")
+        all_tput = agg_tput_df[focus_cols].groupby(focus_col)
     else:
         all_tput = agg_tput_df[focus_cols].groupby("type")
     # Group by test type/direction and timestamp hour
-    focus_cols += ["timestamp_hour"]
-    if by_direction:
-        hourly_tput = agg_tput_df[focus_cols].groupby(
-            ["direction", "timestamp_hour"])
-    else:
-        hourly_tput = agg_tput_df[focus_cols].groupby(
-            ["type", "timestamp_hour"])
+    hourly_tput = agg_tput_df[focus_cols + ["timestamp_hour"]].groupby(
+        [focus_col, "timestamp_hour"])
 
     # DFs
     all_tput_mean = all_tput.mean()
     all_tput_count_day = all_tput.count().apply(lambda x: x / 24)
-    if by_direction:
-        hourly_tput_stddev = hourly_tput.mean().groupby("direction").std()
-        hourly_count_stddev = hourly_tput.count().groupby("direction").std()
-    else:
-        hourly_tput_stddev = hourly_tput.mean().groupby("type").std()
-        hourly_count_stddev = hourly_tput.count().groupby("type").std()
+    hourly_tput_stddev = hourly_tput.mean().groupby(focus_col).std()
+    hourly_count_stddev = hourly_tput.count().groupby(focus_col).std()
     if has_eth0:
         all_tput_mean = all_tput_mean.rename(columns={
             "max_tput_mbps_eth0": "mean_tput_mbps_eth0"})
@@ -95,9 +92,30 @@ def create_csv(agg_tput_df, by_direction=False):
         hourly_count_stddev = hourly_count_stddev.rename(columns={
             "max_tput_mbps_wlan1": "hourly_count_stddev_wlan1"})
 
-    return pd.concat(
+    # Group by timestamp day of the week
+    cons_week = agg_tput_df[
+        [focus_col, "timestamp_date", "timestamp_dow"]].groupby(
+        [focus_col, "timestamp_dow"]).apply(
+        lambda x: x.nunique())
+    available_dow = agg_tput_df["timestamp_dow"].unique()
+    for i in range(0, 7):
+        if i not in available_dow:
+            for focus_idx in agg_tput_df[focus_col].unique():
+                cons_week.loc[(focus_idx, i), :] = 0
+    logging.info(cons_week)
+    cons_week = cons_week["timestamp_date"].groupby(focus_col).min()
+
+    out_df = pd.concat(
         [all_tput_mean, all_tput_count_day, hourly_tput_stddev,
          hourly_count_stddev], axis=1)
+    out_df["total_day"] = 0
+    out_df["total_consecutive_week"] = 0
+    for idx in out_df.index:
+        out_df.loc[idx, "total_day"] = len(
+            agg_tput_df[agg_tput_df[focus_col] == idx][
+                "timestamp_date"].unique())
+        out_df.loc[idx, "total_consecutive_week"] = cons_week[idx]
+    return out_df
 
 
 def combine_device_list(device_list_df, agg_tput_dfs, remove_empty=False):
@@ -107,44 +125,37 @@ def combine_device_list(device_list_df, agg_tput_dfs, remove_empty=False):
     col_index = device_list_df.shape[1] - 1
     col_to_add = ["mean_dl_tput_mbps_eth", "mean_dl_tput_mbps_wlan",
                   "mean_ul_tput_mbps_eth", "mean_ul_tput_mbps_wlan",
-                  "day_worth_of_dl_data_eth", "day_worth_of_dl_data_wlan",
-                  "day_worth_of_ul_data_eth", "day_worth_of_ul_data_wlan"]
+                  "total_day", "total_consecutive_week"]
     for i in range(len(col_to_add)):
         device_list_df.insert(col_index + i, col_to_add[i], None)
 
     for mac in device_list_df.index:
         if mac in agg_tput_dfs:
             out_df = create_csv(agg_tput_dfs[mac], by_direction=True)
+            device_list_df.loc[mac, "total_day"] = max(
+                out_df.loc["dl", "total_day"],
+                out_df.loc["ul", "total_day"])
+            device_list_df.loc[mac, "total_consecutive_week"] = max(
+                out_df.loc["dl", "total_consecutive_week"],
+                out_df.loc["ul", "total_consecutive_week"])
             if "mean_tput_mbps_eth0" in out_df.columns:
                 device_list_df.loc[mac, [
                     "mean_dl_tput_mbps_eth",
-                    "mean_ul_tput_mbps_eth",
-                    "day_worth_of_dl_data_eth",
-                    "day_worth_of_ul_data_eth"]] = (
+                    "mean_ul_tput_mbps_eth"]] = (
                         out_df.loc["dl", "mean_tput_mbps_eth0"],
-                        out_df.loc["ul", "mean_tput_mbps_eth0"],
-                        out_df.loc["dl", "day_worth_of_data_eth0"] / 2,
-                        out_df.loc["ul", "day_worth_of_data_eth0"] / 2)
+                        out_df.loc["ul", "mean_tput_mbps_eth0"])
             if "mean_tput_mbps_wlan1" in out_df.columns:
                 device_list_df.loc[mac, [
                     "mean_dl_tput_mbps_wlan",
-                    "mean_ul_tput_mbps_wlan",
-                    "day_worth_of_dl_data_wlan",
-                    "day_worth_of_ul_data_wlan"]] = (
+                    "mean_ul_tput_mbps_wlan"]] = (
                         out_df.loc["dl", "mean_tput_mbps_wlan1"],
-                        out_df.loc["ul", "mean_tput_mbps_wlan1"],
-                        out_df.loc["dl", "day_worth_of_data_wlan1"] / 2,
-                        out_df.loc["ul", "day_worth_of_data_wlan1"] / 2)
+                        out_df.loc["ul", "mean_tput_mbps_wlan1"])
             elif "mean_tput_mbps_wlan0" in out_df.columns:
                 device_list_df.loc[mac, [
                     "mean_dl_tput_mbps_wlan",
-                    "mean_ul_tput_mbps_wlan",
-                    "day_worth_of_dl_data_wlan",
-                    "day_worth_of_ul_data_wlan"]] = (
+                    "mean_ul_tput_mbps_wlan"]] = (
                         out_df.loc["dl", "mean_tput_mbps_wlan0"],
-                        out_df.loc["ul", "mean_tput_mbps_wlan0"],
-                        out_df.loc["dl", "day_worth_of_data_wlan0"] / 2,
-                        out_df.loc["ul", "day_worth_of_data_wlan0"] / 2)
+                        out_df.loc["ul", "mean_tput_mbps_wlan0"])
         elif remove_empty:
             # Remove row with non-existent tput data
             device_list_df = device_list_df[device_list_df.index != mac]
