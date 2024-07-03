@@ -55,7 +55,7 @@ def get_last_tests(mac, log_dir, now_timestamp):
         "eth": None,
         "wla": None
     }
-    search_thr = 93600  # File search threshold: 26 hours
+    search_thr = 2592000  # File search threshold: 1 month
 
     # Check speedtest first since speedtest runs last
     speedtest_dir = log_dir.joinpath(mac, "speedtest-log")
@@ -78,7 +78,8 @@ def get_last_tests(mac, log_dir, now_timestamp):
                      iface, time.isoformat(timespec="seconds"))
 
         # Assign output if it is unassigned
-        if output[iface] is None:
+        if (output[iface] is None
+                and (now_timestamp - time).total_seconds() <= search_thr):
             output[iface] = time
 
         # Exit if output is assigned for all interfaces
