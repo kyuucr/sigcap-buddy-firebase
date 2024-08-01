@@ -3,6 +3,7 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db
 from uuid import getnode as get_mac
+import json
 
 cred = credentials.Certificate(
     "nd-schmidt-firebase-adminsdk-d1gei-43db929d8a.json")
@@ -28,8 +29,8 @@ default_config = {
 }
 
 helper_dict = {
-    "monitor_interface": "Monitor interface",
-    "wireless_interface": "Wireless interface",
+    "monitor_interface": "WLAN interface for monitor mode",
+    "wireless_interface": "WLAN interface for data transmission",
     "speedtest_interval": "Speedtest interval in minutes",
     "upload_interval": ("Upload interval in minutes, set to 0 to "
                         "upload right after the tests"),
@@ -51,49 +52,66 @@ def main():
     parser = ArgumentParser(
         prog="firebase_store_config.py",
         description="Store sigcap-buddy configuration to Firebase DB")
-    parser.add_argument("--mac", type=str, help="Input MAC")
-    for key in default_config:
-        command = key.replace("_", "-")
-        parser.add_argument(f"--{command}",
-                            type=type(default_config[key]),
-                            help=helper_dict[key])
-    args = vars(parser.parse_args())
+    parser.add_argument("--delete", type=str, help="Specify MAC ID to delete")
+    parser.add_argument("--show", type=str, help="Specify MAC ID to show")
+    args = parser.parse_args()
 
-    mac = args["mac"]
-    if (mac is None):
+    delete_mac = args.delete
+    show_mac = args.show
+    if (delete_mac is not None):
+        # Delete mode
+        delete_mac = delete_mac.replace("-", ":")
+        query = db.reference("config").order_by_child("mac").equal_to(
+            delete_mac).get()
+        keys = list(query.keys())
+
+        if (len(keys) > 0):
+            db.reference("config").child(keys[0]).delete()
+        else:
+            print(f"Cannot find Wi-Fi entry for MAC {delete_mac}!")
+    elif (show_mac is not None):
+        # Show mode
+        show_mac = show_mac.replace("-", ":")
+        query = db.reference("config").order_by_child("mac").equal_to(
+            show_mac).get()
+        values = list(query.values())
+
+        if (len(values) > 0):
+            print(json.dumps(values[0], indent=2))
+        else:
+            print(f"Cannot find Wi-Fi entry for MAC {show_mac}!")
+    else:
+        # Add mode
         mac = input("Input MAC [{}]: ".format(def_mac)).replace("-", ":")
         if (mac == ""):
             mac = def_mac
 
-    config = default_config.copy()
-    query = db.reference("config").order_by_child(
-        "mac").equal_to(mac).get()
-    values = list(query.values())
-    keys = list(query.keys())
-    if (len(values) > 0):
-        val = values[0]
-        for key in val:
-            if (key != "mac" and val[key]):
-                config[key] = val[key]
+        config = default_config.copy()
+        query = db.reference("config").order_by_child("mac").equal_to(
+            mac).get()
+        values = list(query.values())
+        keys = list(query.keys())
+        if (len(values) > 0):
+            val = values[0]
+            for key in val:
+                if (key != "mac" and val[key]):
+                    config[key] = val[key]
 
-    for key in config:
-        temp = args[key]
-        if (temp is None):
+        for key in config:
             temp = input(helper_dict[key] + f" [{config[key]}]: ")
-        if (temp):
-            if (isinstance(default_config[key], int)):
-                temp = int(temp)
-            elif (isinstance(default_config[key], float)):
-                temp = float(temp)
-            config[key] = temp
+            if (temp):
+                if (isinstance(default_config[key], int)):
+                    temp = int(temp)
+                elif (isinstance(default_config[key], float)):
+                    temp = float(temp)
+                config[key] = temp
 
-    print(config)
-    if (len(keys) > 0):
-        db.reference("config").child(keys[0]).update(config)
-    else:
-        config["mac"] = mac
-        db.reference("config").push().set(config)
-    print(f"Config for MAC {mac} successfully added!")
+        if (len(keys) > 0):
+            db.reference("config").child(keys[0]).update(config)
+        else:
+            config["mac"] = mac
+            db.reference("config").push().set(config)
+        print(f"Config for MAC {mac} successfully added!")
 
 
 if __name__ == "__main__":
