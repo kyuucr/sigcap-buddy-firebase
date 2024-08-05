@@ -25,29 +25,101 @@ def write(df, args):
 def join_overlap(df_main, df_scan, col_prefix, overlap_fun):
     overlap_indices = overlap_fun(df_scan)
     logging.info(df_scan[overlap_indices])
-    overlap_group = df_scan[overlap_indices].groupby(
-        "test_uuid_concat")["rssi_dbm"]
 
-    # Join with neighboring APs statistics
-    df_main = df_main.join(overlap_group.count().rename(
+    # Join neighboring APs' RSSI statistics
+    overlap_group_rssi = df_scan[overlap_indices].groupby(
+        "test_uuid_concat")["rssi_dbm"]
+    df_main = df_main.join(overlap_group_rssi.count().rename(
         f"{col_prefix}_count"), on="test_uuid_concat")
-    df_main = df_main.join(overlap_group.apply(
+    df_main = df_main.join(overlap_group_rssi.apply(
         lambda x: mw_to_dbm(dbm_to_mw(x).mean())).rename(
             f"{col_prefix}_mean_rssi_dbm"),
         on="test_uuid_concat")
-    # df_main = df_main.join(overlap_group.apply(
+    # df_main = df_main.join(overlap_group_rssi.apply(
     #     lambda x: mw_to_dbm(dbm_to_mw(x).std())).rename(
     #     f"{col_prefix}_std_rssi_dbm"),
     #     on="test_uuid_concat")
-    df_main = df_main.join(overlap_group.median().rename(
+    df_main = df_main.join(overlap_group_rssi.median().rename(
         f"{col_prefix}_median_rssi_dbm"), on="test_uuid_concat")
     df_main = df_main.join(
-        overlap_group.min().rename(
+        overlap_group_rssi.min().rename(
             f"{col_prefix}_min_rssi_dbm"),
         on="test_uuid_concat")
     df_main = df_main.join(
-        overlap_group.max().rename(
+        overlap_group_rssi.max().rename(
             f"{col_prefix}_max_rssi_dbm"),
+        on="test_uuid_concat")
+
+    # Prepare group for optional beacon elements
+    overlap_group = df_scan[overlap_indices][[
+        "tx_power_dbm", "sta_count", "ch_utilization"]]
+    overlap_group = overlap_group.astype(
+        {"tx_power_dbm": float, "sta_count": float, "ch_utilization": float})
+
+    # Join neighboring APs' TX power statistics
+    overlap_group_tx_power = overlap_group[["tx_power_dbm"]].dropna().groupby(
+        "test_uuid_concat")["tx_power_dbm"]
+    df_main = df_main.join(overlap_group_tx_power.count().rename(
+        f"{col_prefix}_num_bssid_with_power_elem"),
+        on="test_uuid_concat")
+    df_main = df_main.join(overlap_group_tx_power.mean().rename(
+        f"{col_prefix}_mean_tx_power_dbm"),
+        on="test_uuid_concat")
+    # df_main = df_main.join(overlap_group_tx_power.std().rename(
+    #     f"{col_prefix}_std_tx_power_dbm"),
+    #     on="test_uuid_concat")
+    df_main = df_main.join(overlap_group_tx_power.median().rename(
+        f"{col_prefix}_median_tx_power_dbm"), on="test_uuid_concat")
+    df_main = df_main.join(
+        overlap_group_tx_power.min().rename(
+            f"{col_prefix}_min_tx_power_dbm"),
+        on="test_uuid_concat")
+    df_main = df_main.join(
+        overlap_group_tx_power.max().rename(
+            f"{col_prefix}_max_tx_power_dbm"),
+        on="test_uuid_concat")
+
+    # Join neighboring APs' CH util statistics
+    overlap_group_ch_util = overlap_group[["ch_utilization"]].dropna().groupby(
+        "test_uuid_concat")["ch_utilization"]
+    df_main = df_main.join(overlap_group_ch_util.count().rename(
+        f"{col_prefix}_num_bssid_with_load_elem"),
+        on="test_uuid_concat")
+    df_main = df_main.join(overlap_group_ch_util.mean().rename(
+        f"{col_prefix}_mean_ch_utilization"),
+        on="test_uuid_concat")
+    # df_main = df_main.join(overlap_group_ch_util.std().rename(
+    #     f"{col_prefix}_std_ch_utilization"),
+    #     on="test_uuid_concat")
+    df_main = df_main.join(overlap_group_ch_util.median().rename(
+        f"{col_prefix}_median_ch_utilization"), on="test_uuid_concat")
+    df_main = df_main.join(
+        overlap_group_ch_util.min().rename(
+            f"{col_prefix}_min_ch_utilization"),
+        on="test_uuid_concat")
+    df_main = df_main.join(
+        overlap_group_ch_util.max().rename(
+            f"{col_prefix}_max_ch_utilization"),
+        on="test_uuid_concat")
+
+    # Join neighboring APs' STA count statistics
+    overlap_group_sta_count = overlap_group[["sta_count"]].dropna().groupby(
+        "test_uuid_concat")["sta_count"]
+    df_main = df_main.join(overlap_group_sta_count.mean().rename(
+        f"{col_prefix}_mean_sta_count"),
+        on="test_uuid_concat")
+    # df_main = df_main.join(overlap_group_sta_count.std().rename(
+    #     f"{col_prefix}_std_sta_count"),
+    #     on="test_uuid_concat")
+    df_main = df_main.join(overlap_group_sta_count.median().rename(
+        f"{col_prefix}_median_sta_count"), on="test_uuid_concat")
+    df_main = df_main.join(
+        overlap_group_sta_count.min().rename(
+            f"{col_prefix}_min_sta_count"),
+        on="test_uuid_concat")
+    df_main = df_main.join(
+        overlap_group_sta_count.max().rename(
+            f"{col_prefix}_max_sta_count"),
         on="test_uuid_concat")
 
     return df_main
