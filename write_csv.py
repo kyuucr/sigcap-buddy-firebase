@@ -168,7 +168,38 @@ def get_lat_line(mac, json_dict):
 
     if ("start" in json_dict):
         # iperf file
-        pass
+        iperf_mean_lat = np.mean([val["sender"]["mean_rtt"] / 1e3
+                                  for val in json_dict["end"]["streams"]])
+        if iperf_mean_lat == 0:
+            return outarr
+        iperf_min_lat = np.mean([val["sender"]["min_rtt"] / 1e3
+                                 for val in json_dict["end"]["streams"]])
+        iperf_max_lat = np.mean([val["sender"]["max_rtt"] / 1e3
+                                 for val in json_dict["end"]["streams"]])
+        outarr.append({
+            "timestamp": datetime.fromtimestamp(
+                json_dict["start"]["timestamp"]["timesecs"]
+            ).astimezone().isoformat(timespec="seconds"),
+            "mac": mac,
+            "test_uuid": (json_dict["start"]["test_uuid"]
+                          if "test_uuid" in json_dict["start"]
+                          else "unknown"),
+            "type": ("iperf_rtt_dl"
+                     if json_dict["start"]["test_start"]["reverse"] == 1
+                     else "iperf_rtt_ul"),
+            "interface": (json_dict["start"]["interface"]
+                          if "interface" in json_dict["start"]
+                          else "eth0"),
+            "host": "{}:{}".format(
+                json_dict["start"]["connecting_to"]["host"],
+                str(json_dict["start"]["connecting_to"]["port"])),
+            "isp": "unknown",
+            "latency_ms": iperf_mean_lat,
+            "jitter_ms": "NaN",
+            "min_latency_ms": iperf_min_lat,
+            "max_latency_ms": iperf_max_lat,
+            "median_latency_ms": "NaN"
+        })
     elif ("type" in json_dict):
         # new speedtest file
         timestamp = datetime.fromisoformat(
@@ -608,7 +639,8 @@ def read_logs(args):
                                            or "speedtest-log" in str(x)),
                                 files))
         case "latency":
-            files = list(filter(lambda x: ("ping-log" in str(x)
+            files = list(filter(lambda x: ("iperf-log" in str(x)
+                                           or "ping-log" in str(x)
                                            or "speedtest-log" in str(x)),
                                 files))
         case "wifi_scan":
