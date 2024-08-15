@@ -184,9 +184,9 @@ def get_lat_line(mac, json_dict):
             "test_uuid": (json_dict["start"]["test_uuid"]
                           if "test_uuid" in json_dict["start"]
                           else "unknown"),
-            "type": ("iperf_rtt_dl"
+            "type": ("iperf-rtt-dl"
                      if json_dict["start"]["test_start"]["reverse"] == 1
-                     else "iperf_rtt_ul"),
+                     else "iperf-rtt-ul"),
             "interface": (json_dict["start"]["interface"]
                           if "interface" in json_dict["start"]
                           else "eth0"),
@@ -211,7 +211,7 @@ def get_lat_line(mac, json_dict):
             "timestamp": timestamp,
             "mac": mac,
             "test_uuid": test_uuid,
-            "type": "speedtest_idle",
+            "type": "speedtest-idle",
             "interface": json_dict["interface"]["name"],
             "host": json_dict["server"]["host"],
             "isp": json_dict["isp"],
@@ -226,7 +226,7 @@ def get_lat_line(mac, json_dict):
                 "timestamp": timestamp,
                 "mac": mac,
                 "test_uuid": test_uuid,
-                "type": "speedtest_dl_load",
+                "type": "speedtest-dl",
                 "interface": json_dict["interface"]["name"],
                 "host": json_dict["server"]["host"],
                 "isp": json_dict["isp"],
@@ -241,7 +241,7 @@ def get_lat_line(mac, json_dict):
                 "timestamp": timestamp,
                 "mac": mac,
                 "test_uuid": test_uuid,
-                "type": "speedtest_ul_load",
+                "type": "speedtest-ul",
                 "interface": json_dict["interface"]["name"],
                 "host": json_dict["server"]["host"],
                 "isp": json_dict["isp"],
@@ -255,8 +255,7 @@ def get_lat_line(mac, json_dict):
         if (json_dict["pings"] is not None):
             iface = json_dict["interface"]
             test_uuid = json_dict["extra"]["test_uuid"]
-            corr_test = "ping_" + json_dict["extra"]["corr_test"].replace(
-                "-", "_")
+            corr_test = "ping-" + json_dict["extra"]["corr_test"]
             for entry in json_dict["pings"]:
                 entry["responses"] = list(
                     filter(lambda x: ("type" in x and x["type"] == "reply"),
@@ -299,7 +298,7 @@ def get_lat_line(mac, json_dict):
             "timestamp": timestamp,
             "mac": mac,
             "test_uuid": "unknown",
-            "type": "speedtest_idle",
+            "type": "speedtest-idle",
             "interface": "eth0",
             "host": json_dict["server"]["host"],
             "isp": json_dict["client"]["isp"],
@@ -318,6 +317,7 @@ def get_scan_line(mac, json_dict):
     outlist = list()
     if ("beacons" not in json_dict or json_dict["beacons"] is None):
         return outlist
+    logging.debug("json_dict exists!")
 
     timestamp = datetime.fromisoformat(
         json_dict["timestamp"]).astimezone().isoformat(timespec="seconds")
@@ -348,8 +348,10 @@ def get_scan_line(mac, json_dict):
         "link_min_rx_bitrate_mbps": "NaN",
         "link_median_rx_bitrate_mbps": "NaN"
     }
+    logging.debug("links in json_dict? %s", "links" in json_dict)
     if "links" in json_dict:
-        if "rssi" in json_dict["links"]:
+        logging.debug("rssi in json_dict? %s", "rssi" in json_dict["links"])
+        if len(json_dict["links"]) > 0 and "rssi" in json_dict["links"][0]:
             rssi_dbm = [re_dbm.findall(val["rssi"])
                         for val in json_dict["links"]]
             rssi_dbm = np.array([int(val[0]) for val in rssi_dbm
@@ -361,7 +363,8 @@ def get_scan_line(mac, json_dict):
                 links["link_min_rssi_dbm"] = np.min(rssi_dbm)
                 links["link_median_rssi_dbm"] = np.median(rssi_dbm)
 
-        if "tx_bitrate" in json_dict["links"]:
+        if (len(json_dict["links"]) > 0
+                and "tx_bitrate" in json_dict["links"][0]):
             tx_bitrate_mbps = [re_mbps.findall(val["tx_bitrate"])
                                for val in json_dict["links"]]
             tx_bitrate_mbps = [float(val[0]) for val in tx_bitrate_mbps
@@ -373,7 +376,8 @@ def get_scan_line(mac, json_dict):
                 links["link_median_tx_bitrate_mbps"] = np.median(
                     tx_bitrate_mbps)
 
-        if "rx_bitrate" in json_dict["links"]:
+        if (len(json_dict["links"]) > 0
+                and "rx_bitrate" in json_dict["links"][0]):
             rx_bitrate_mbps = [re_mbps.findall(val["rx_bitrate"])
                                for val in json_dict["links"]]
             rx_bitrate_mbps = [float(val[0]) for val in rx_bitrate_mbps
@@ -384,6 +388,7 @@ def get_scan_line(mac, json_dict):
                 links["link_min_rx_bitrate_mbps"] = np.min(rx_bitrate_mbps)
                 links["link_median_rx_bitrate_mbps"] = np.median(
                     rx_bitrate_mbps)
+    logging.debug("links: %s", links)
 
     # Print beacons
     for beacon in json_dict["beacons"]:
