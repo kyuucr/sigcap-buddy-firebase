@@ -359,8 +359,8 @@ def get_scan_line(mac, json_dict):
             if len(rssi_dbm) > 0:
                 links["link_mean_rssi_dbm"] = mw_to_dbm(np.mean(dbm_to_mw(
                     rssi_dbm)))
-                links["link_max_rssi_dbm"] = np.max(rssi_dbm)
-                links["link_min_rssi_dbm"] = np.min(rssi_dbm)
+                links["link_max_rssi_dbm"] = int(np.max(rssi_dbm))
+                links["link_min_rssi_dbm"] = int(np.min(rssi_dbm))
                 links["link_median_rssi_dbm"] = np.median(rssi_dbm)
 
         if (len(json_dict["links"]) > 0
@@ -371,8 +371,10 @@ def get_scan_line(mac, json_dict):
                                if len(val) > 0]
             if len(tx_bitrate_mbps) > 0:
                 links["link_mean_tx_bitrate_mbps"] = np.mean(tx_bitrate_mbps)
-                links["link_max_tx_bitrate_mbps"] = np.max(tx_bitrate_mbps)
-                links["link_min_tx_bitrate_mbps"] = np.min(tx_bitrate_mbps)
+                links["link_max_tx_bitrate_mbps"] = int(
+                    np.max(tx_bitrate_mbps))
+                links["link_min_tx_bitrate_mbps"] = int(
+                    np.min(tx_bitrate_mbps))
                 links["link_median_tx_bitrate_mbps"] = np.median(
                     tx_bitrate_mbps)
 
@@ -384,8 +386,10 @@ def get_scan_line(mac, json_dict):
                                if len(val) > 0]
             if len(rx_bitrate_mbps) > 0:
                 links["link_mean_rx_bitrate_mbps"] = np.mean(rx_bitrate_mbps)
-                links["link_max_rx_bitrate_mbps"] = np.max(rx_bitrate_mbps)
-                links["link_min_rx_bitrate_mbps"] = np.min(rx_bitrate_mbps)
+                links["link_max_rx_bitrate_mbps"] = int(
+                    np.max(rx_bitrate_mbps))
+                links["link_min_rx_bitrate_mbps"] = int(
+                    np.min(rx_bitrate_mbps))
                 links["link_median_rx_bitrate_mbps"] = np.median(
                     rx_bitrate_mbps)
     logging.debug("links: %s", links)
