@@ -147,8 +147,9 @@ def create_tput_df(tput_dict):
     combined = out_tput.pivot(
         index="test_uuid_concat",
         columns="interface",
-        values=["timestamp", "type_dir", "mean_tput_mbps", "std_tput_mbps",
-                "min_tput_mbps", "max_tput_mbps", "median_tput_mbps"])
+        values=["timestamp", "type_dir", "host", "mean_tput_mbps",
+                "std_tput_mbps", "min_tput_mbps", "max_tput_mbps",
+                "median_tput_mbps"])
     combined.columns = ['_'.join(col) for col in combined.columns]
     # combined = combined[combined["mean_tput_mbps_wlan0"] > 0]
     combined.insert(0, "timestamp", None)
