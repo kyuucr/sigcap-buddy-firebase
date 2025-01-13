@@ -282,6 +282,8 @@ def agg_tput(args):
               "-l", args.log_level]
     if args.start_time:
         params += ["--start-time", args.start_time]
+    if args.end_time:
+        params += ["--end-time", args.end_time]
     raw_scan = write_csv.read_logs(write_csv.parse(params))
 
     out_df = create_csv(raw_tput, raw_scan)
@@ -295,6 +297,9 @@ def parse(list_args=None):
                         help="Specify MAC address.")
     parser.add_argument("--start-time", nargs='?',
                         help=("Filter data to the speficied start time (must "
+                              "be in ISO format, ex: 2024-06-14T17:00-0500)"))
+    parser.add_argument("--end-time", nargs='?',
+                        help=("Filter data to the speficied end time (must "
                               "be in ISO format, ex: 2024-06-14T17:00-0500)"))
     parser.add_argument("-J", "--json", action="store_true",
                         help="Output as JSON.")

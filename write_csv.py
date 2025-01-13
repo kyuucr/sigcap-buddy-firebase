@@ -675,11 +675,16 @@ def read_logs(args):
                     args.mode,
                     file.parts[1],
                     json_dict)
-                if len(curr_line) > 0 and (
-                    (args.start_time is None)
-                    or (args.start_time < datetime.fromisoformat(
-                        curr_line[0]["timestamp"]))):
-                    outarr += curr_line
+                if (len(curr_line) > 0):
+                    curr_time = datetime.fromisoformat(
+                        curr_line[0]["timestamp"])
+                    is_pass = ((args.start_time is None)
+                               or (args.start_time < curr_time))
+                    is_pass = is_pass and (
+                        (args.end_time is None)
+                        or (args.end_time > curr_time))
+                    if is_pass:
+                        outarr += curr_line
 
     return outarr
 
@@ -695,6 +700,10 @@ def parse(list_args=None):
     parser.add_argument("--start-time", nargs='?',
                         type=(lambda x: datetime.fromisoformat(x)),
                         help=("Filter data to the speficied start time (must "
+                              "be in ISO format, ex: 2024-06-14T17:00-0500)"))
+    parser.add_argument("--end-time", nargs='?',
+                        type=(lambda x: datetime.fromisoformat(x)),
+                        help=("Filter data to the speficied end time (must "
                               "be in ISO format, ex: 2024-06-14T17:00-0500)"))
     parser.add_argument("-o", "--output-file", nargs='?',
                         type=argparse.FileType('w'), default=sys.stdout,

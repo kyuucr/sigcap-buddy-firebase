@@ -17,6 +17,7 @@ import write_csv
 args = None
 rpi_ids = None
 rpi_start_time = dict()
+rpi_end_time = dict()
 heartbeats = None
 
 
@@ -32,6 +33,8 @@ def process_mac(mac):
               "-l", args.log_level]
     if mac in rpi_start_time and rpi_start_time[mac]:
         params += ["--start-time", rpi_start_time[mac]]
+    if mac in rpi_end_time and rpi_end_time[mac]:
+        params += ["--end-time", rpi_end_time[mac]]
     out_tput = write_csv.read_logs(write_csv.parse(params))
     if (len(out_tput) > 0):
         write_csv.write(out_tput, write_csv.parse(
@@ -55,6 +58,8 @@ def process_mac(mac):
               "-l", args.log_level]
     if mac in rpi_start_time and rpi_start_time[mac]:
         params += ["--start-time", rpi_start_time[mac]]
+    if mac in rpi_end_time and rpi_end_time[mac]:
+        params += ["--end-time", rpi_end_time[mac]]
     out_lat = write_csv.read_logs(write_csv.parse(params))
     if (len(out_lat) > 0):
         write_csv.write(out_lat, write_csv.parse(
@@ -78,6 +83,8 @@ def process_mac(mac):
               "-l", args.log_level]
     if mac in rpi_start_time and rpi_start_time[mac]:
         params += ["--start-time", rpi_start_time[mac]]
+    if mac in rpi_end_time and rpi_end_time[mac]:
+        params += ["--end-time", rpi_end_time[mac]]
     out_scan = write_csv.read_logs(write_csv.parse(params))
     if (len(out_scan) > 0):
         write_csv.write(out_scan, write_csv.parse(
@@ -184,6 +191,12 @@ def batch_extract():
             temp = json.load(file)
             for key, val in temp.items():
                 rpi_start_time[rpi_ids[key]] = val
+    rpi_time_file = Path(".rpi-end-time.json")
+    if rpi_ids is not None and rpi_time_file.is_file():
+        with open(rpi_time_file) as file:
+            temp = json.load(file)
+            for key, val in temp.items():
+                rpi_end_time[rpi_ids[key]] = val
 
     last_update = None
     last_update_file = args.outdir.joinpath("last_update.json")
@@ -193,12 +206,15 @@ def batch_extract():
             print(f"Got last update: {last_update}")
 
     print("1. Download and zip all logs")
-    download_args = []
-    if last_update:
-        download_args += ["--start-date", last_update]
-    if args.rsync:
-        download_args += ["--rsync"]
-    firebase_download.download(firebase_download.parse(download_args))
+    if args.skip_dl:
+        print("Skipping downloading Firebase files...")
+    else:
+        download_args = []
+        if last_update:
+            download_args += ["--start-date", last_update]
+        if args.rsync:
+            download_args += ["--rsync"]
+        firebase_download.download(firebase_download.parse(download_args))
     print("Zipping all logs...")
     cmd_out = subprocess.run(
         ["zip", "-ur",
@@ -276,6 +292,8 @@ def parse(list_args=None):
                         help="Specify number of parallel processes, default=8")
     parser.add_argument("--rsync", action="store_true",
                         help="Use rsync to server instead of Firebase")
+    parser.add_argument("--skip-dl", action="store_true",
+                        help="Skip downloading new files from Firebase")
     parser.add_argument("-l", "--log-level", default="warning",
                         help="Provide logging level, default is warning'")
     if (list_args is None):
