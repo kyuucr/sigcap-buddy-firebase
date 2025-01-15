@@ -660,6 +660,7 @@ def read_logs(args):
     logging.debug(files)
 
     outarr = list()
+    wlan1_dt_threshold = datetime.fromisoformat("2024-08-16T00:00-0400")
 
     for file in files:
         logging.info("Reading %s", file)
@@ -683,6 +684,11 @@ def read_logs(args):
                     is_pass = is_pass and (
                         (args.end_time is None)
                         or (args.end_time > curr_time))
+                    # Check if interface == wlan1, then only allow data after
+                    # date threshold.
+                    is_pass = is_pass and (
+                        (curr_line[0]["interface"] != "wlan1")
+                        or (curr_time > wlan1_dt_threshold))
                     if is_pass:
                         outarr += curr_line
 
