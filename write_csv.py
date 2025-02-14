@@ -68,10 +68,12 @@ def get_tput_line(mac, json_dict):
                 json_dict["end"]["sum_received"]["bytes"] / 1e6,
             "tput_mbps":
                 json_dict["end"]["sum_received"]["bits_per_second"] / 1e6,
-            "std_tput_mbps": np.std(iperf_tputs),
+            "std_tput_mbps": np.nanstd(iperf_tputs),
             "max_tput_mbps": max(iperf_tputs),
             "min_tput_mbps": min(iperf_tputs),
-            "median_tput_mbps": np.median(iperf_tputs)
+            "median_tput_mbps": np.nanmedian(iperf_tputs),
+            "25perc_tput_mbps": np.nanpercentile(iperf_tputs, 25),
+            "75perc_tput_mbps": np.nanpercentile(iperf_tputs, 75)
         })
     elif ("type" in json_dict):
         # new speedtest file
@@ -95,7 +97,9 @@ def get_tput_line(mac, json_dict):
             "std_tput_mbps": "NaN",
             "max_tput_mbps": json_dict["download"]["bandwidth"] * 8 / 1e6,
             "min_tput_mbps": json_dict["download"]["bandwidth"] * 8 / 1e6,
-            "median_tput_mbps": json_dict["download"]["bandwidth"] * 8 / 1e6
+            "median_tput_mbps": json_dict["download"]["bandwidth"] * 8 / 1e6,
+            "25perc_tput_mbps": json_dict["download"]["bandwidth"] * 8 / 1e6,
+            "75perc_tput_mbps": json_dict["download"]["bandwidth"] * 8 / 1e6
         })
         outarr.append({
             "timestamp": timestamp,
@@ -112,7 +116,9 @@ def get_tput_line(mac, json_dict):
             "std_tput_mbps": "NaN",
             "max_tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6,
             "min_tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6,
-            "median_tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6
+            "median_tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6,
+            "25perc_tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6,
+            "75perc_tput_mbps": json_dict["upload"]["bandwidth"] * 8 / 1e6
         })
     elif ("pings" in json_dict):
         pass
@@ -137,7 +143,9 @@ def get_tput_line(mac, json_dict):
             "std_tput_mbps": "NaN",
             "max_tput_mbps": json_dict["download"] / 1e6,
             "min_tput_mbps": json_dict["download"] / 1e6,
-            "median_tput_mbps": json_dict["download"] / 1e6
+            "median_tput_mbps": json_dict["download"] / 1e6,
+            "25perc_tput_mbps": json_dict["download"] / 1e6,
+            "75perc_tput_mbps": json_dict["download"] / 1e6
         })
         outarr.append({
             "timestamp": timestamp,
@@ -154,7 +162,9 @@ def get_tput_line(mac, json_dict):
             "std_tput_mbps": "NaN",
             "max_tput_mbps": json_dict["upload"] / 1e6,
             "min_tput_mbps": json_dict["upload"] / 1e6,
-            "median_tput_mbps": json_dict["upload"] / 1e6
+            "median_tput_mbps": json_dict["upload"] / 1e6,
+            "25perc_tput_mbps": json_dict["upload"] / 1e6,
+            "75perc_tput_mbps": json_dict["upload"] / 1e6
         })
 
     logging.debug(outarr)
@@ -168,13 +178,13 @@ def get_lat_line(mac, json_dict):
 
     if ("start" in json_dict):
         # iperf file
-        iperf_mean_lat = np.mean([val["sender"]["mean_rtt"] / 1e3
+        iperf_mean_lat = np.nanmean([val["sender"]["mean_rtt"] / 1e3
                                   for val in json_dict["end"]["streams"]])
         if iperf_mean_lat == 0:
             return outarr
-        iperf_min_lat = np.mean([val["sender"]["min_rtt"] / 1e3
+        iperf_min_lat = np.nanmean([val["sender"]["min_rtt"] / 1e3
                                  for val in json_dict["end"]["streams"]])
-        iperf_max_lat = np.mean([val["sender"]["max_rtt"] / 1e3
+        iperf_max_lat = np.nanmean([val["sender"]["max_rtt"] / 1e3
                                  for val in json_dict["end"]["streams"]])
         outarr.append({
             "timestamp": datetime.fromtimestamp(
@@ -198,7 +208,9 @@ def get_lat_line(mac, json_dict):
             "jitter_ms": "NaN",
             "min_latency_ms": iperf_min_lat,
             "max_latency_ms": iperf_max_lat,
-            "median_latency_ms": "NaN"
+            "median_latency_ms": "NaN",
+            "25perc_latency_ms": "NaN",
+            "75perc_latency_ms": "NaN"
         })
     elif ("type" in json_dict):
         # new speedtest file
@@ -219,7 +231,9 @@ def get_lat_line(mac, json_dict):
             "jitter_ms": json_dict["ping"]["jitter"],
             "min_latency_ms": json_dict["ping"]["latency"],
             "max_latency_ms": json_dict["ping"]["latency"],
-            "median_latency_ms": json_dict["ping"]["latency"]
+            "median_latency_ms": json_dict["ping"]["latency"],
+            "25perc_latency_ms": json_dict["ping"]["latency"],
+            "75perc_latency_ms": json_dict["ping"]["latency"]
         })
         if ("latency" in json_dict["download"]):
             outarr.append({
@@ -234,7 +248,9 @@ def get_lat_line(mac, json_dict):
                 "jitter_ms": json_dict["download"]["latency"]["jitter"],
                 "min_latency_ms": json_dict["download"]["latency"]["iqm"],
                 "max_latency_ms": json_dict["download"]["latency"]["iqm"],
-                "median_latency_ms": json_dict["download"]["latency"]["iqm"]
+                "median_latency_ms": json_dict["download"]["latency"]["iqm"],
+                "25perc_latency_ms": json_dict["download"]["latency"]["iqm"],
+                "75perc_latency_ms": json_dict["download"]["latency"]["iqm"]
             })
         if ("latency" in json_dict["upload"]):
             outarr.append({
@@ -249,7 +265,9 @@ def get_lat_line(mac, json_dict):
                 "jitter_ms": json_dict["upload"]["latency"]["jitter"],
                 "min_latency_ms": json_dict["upload"]["latency"]["iqm"],
                 "max_latency_ms": json_dict["upload"]["latency"]["iqm"],
-                "median_latency_ms": json_dict["upload"]["latency"]["iqm"]
+                "median_latency_ms": json_dict["upload"]["latency"]["iqm"],
+                "25perc_latency_ms": json_dict["upload"]["latency"]["iqm"],
+                "75perc_latency_ms": json_dict["upload"]["latency"]["iqm"]
             })
     elif ("pings" in json_dict):
         if (json_dict["pings"] is not None):
@@ -267,7 +285,11 @@ def get_lat_line(mac, json_dict):
                     latencies_ms = [lat for lat in latencies_ms
                                     if lat != "NaN" and lat is not None]
                     lat_median = ("NaN" if len(latencies_ms) == 0
-                                  else np.median(latencies_ms))
+                                  else np.nanmedian(latencies_ms))
+                    lat_25perc = ("NaN" if len(latencies_ms) == 0
+                                  else np.nanpercentile(latencies_ms, 25))
+                    lat_75perc = ("NaN" if len(latencies_ms) == 0
+                                  else np.nanpercentile(latencies_ms, 75))
                     outarr.append({
                         "timestamp": datetime.fromisoformat(
                             entry["responses"][0]["timestamp"]
@@ -286,7 +308,9 @@ def get_lat_line(mac, json_dict):
                             entry, "NaN", "round_trip_ms_min"),
                         "max_latency_ms": dict_reader(
                             entry, "NaN", "round_trip_ms_max"),
-                        "median_latency_ms": lat_median
+                        "median_latency_ms": lat_median,
+                        "25perc_latency_ms": lat_25perc,
+                        "75perc_latency_ms": lat_75perc
                     })
     elif ("beacons" in json_dict):
         pass
@@ -306,7 +330,9 @@ def get_lat_line(mac, json_dict):
             "jitter_ms": "NaN",
             "min_latency_ms": json_dict["ping"],
             "max_latency_ms": json_dict["ping"],
-            "median_latency_ms": json_dict["ping"]
+            "median_latency_ms": json_dict["ping"],
+            "25perc_latency_ms": json_dict["ping"],
+            "75perc_latency_ms": json_dict["ping"]
         })
 
     logging.debug(outarr)
@@ -339,14 +365,20 @@ def get_scan_line(mac, json_dict):
         "link_max_rssi_dbm": "NaN",
         "link_min_rssi_dbm": "NaN",
         "link_median_rssi_dbm": "NaN",
+        "link_25perc_rssi_dbm": "NaN",
+        "link_75perc_rssi_dbm": "NaN",
         "link_mean_tx_bitrate_mbps": "NaN",
         "link_max_tx_bitrate_mbps": "NaN",
         "link_min_tx_bitrate_mbps": "NaN",
         "link_median_tx_bitrate_mbps": "NaN",
+        "link_25perc_tx_bitrate_mbps": "NaN",
+        "link_75perc_tx_bitrate_mbps": "NaN",
         "link_mean_rx_bitrate_mbps": "NaN",
         "link_max_rx_bitrate_mbps": "NaN",
         "link_min_rx_bitrate_mbps": "NaN",
-        "link_median_rx_bitrate_mbps": "NaN"
+        "link_median_rx_bitrate_mbps": "NaN",
+        "link_25perc_rx_bitrate_mbps": "NaN",
+        "link_75perc_rx_bitrate_mbps": "NaN"
     }
     logging.debug("links in json_dict? %s", "links" in json_dict)
     if "links" in json_dict:
@@ -357,11 +389,13 @@ def get_scan_line(mac, json_dict):
             rssi_dbm = np.array([int(val[0]) for val in rssi_dbm
                                  if len(val) > 0])
             if len(rssi_dbm) > 0:
-                links["link_mean_rssi_dbm"] = mw_to_dbm(np.mean(dbm_to_mw(
+                links["link_mean_rssi_dbm"] = mw_to_dbm(np.nanmean(dbm_to_mw(
                     rssi_dbm)))
                 links["link_max_rssi_dbm"] = int(np.max(rssi_dbm))
                 links["link_min_rssi_dbm"] = int(np.min(rssi_dbm))
-                links["link_median_rssi_dbm"] = np.median(rssi_dbm)
+                links["link_median_rssi_dbm"] = np.nanmedian(rssi_dbm)
+                links["link_25perc_rssi_dbm"] = np.nanpercentile(rssi_dbm, 25)
+                links["link_75perc_rssi_dbm"] = np.nanpercentile(rssi_dbm, 75)
 
         if (len(json_dict["links"]) > 0
                 and "tx_bitrate" in json_dict["links"][0]):
@@ -370,13 +404,17 @@ def get_scan_line(mac, json_dict):
             tx_bitrate_mbps = [float(val[0]) for val in tx_bitrate_mbps
                                if len(val) > 0]
             if len(tx_bitrate_mbps) > 0:
-                links["link_mean_tx_bitrate_mbps"] = np.mean(tx_bitrate_mbps)
+                links["link_mean_tx_bitrate_mbps"] = np.nanmean(tx_bitrate_mbps)
                 links["link_max_tx_bitrate_mbps"] = int(
                     np.max(tx_bitrate_mbps))
                 links["link_min_tx_bitrate_mbps"] = int(
                     np.min(tx_bitrate_mbps))
-                links["link_median_tx_bitrate_mbps"] = np.median(
+                links["link_median_tx_bitrate_mbps"] = np.nanmedian(
                     tx_bitrate_mbps)
+                links["link_25perc_tx_bitrate_mbps"] = np.nanpercentile(
+                    tx_bitrate_mbps, 25)
+                links["link_75perc_tx_bitrate_mbps"] = np.nanpercentile(
+                    tx_bitrate_mbps, 75)
 
         if (len(json_dict["links"]) > 0
                 and "rx_bitrate" in json_dict["links"][0]):
@@ -385,13 +423,17 @@ def get_scan_line(mac, json_dict):
             rx_bitrate_mbps = [float(val[0]) for val in rx_bitrate_mbps
                                if len(val) > 0]
             if len(rx_bitrate_mbps) > 0:
-                links["link_mean_rx_bitrate_mbps"] = np.mean(rx_bitrate_mbps)
+                links["link_mean_rx_bitrate_mbps"] = np.nanmean(rx_bitrate_mbps)
                 links["link_max_rx_bitrate_mbps"] = int(
                     np.max(rx_bitrate_mbps))
                 links["link_min_rx_bitrate_mbps"] = int(
                     np.min(rx_bitrate_mbps))
-                links["link_median_rx_bitrate_mbps"] = np.median(
+                links["link_median_rx_bitrate_mbps"] = np.nanmedian(
                     rx_bitrate_mbps)
+                links["link_25perc_rx_bitrate_mbps"] = np.nanpercentile(
+                    rx_bitrate_mbps, 25)
+                links["link_75perc_rx_bitrate_mbps"] = np.nanpercentile(
+                    rx_bitrate_mbps, 75)
     logging.debug("links: %s", links)
 
     # Print beacons
@@ -426,14 +468,20 @@ def get_scan_line(mac, json_dict):
             "link_max_rssi_dbm": "NaN",
             "link_min_rssi_dbm": "NaN",
             "link_median_rssi_dbm": "NaN",
+            "link_25perc_rssi_dbm": "NaN",
+            "link_75perc_rssi_dbm": "NaN",
             "link_mean_tx_bitrate_mbps": "NaN",
             "link_max_tx_bitrate_mbps": "NaN",
             "link_min_tx_bitrate_mbps": "NaN",
             "link_median_tx_bitrate_mbps": "NaN",
+            "link_25perc_tx_bitrate_mbps": "NaN",
+            "link_75perc_tx_bitrate_mbps": "NaN",
             "link_mean_rx_bitrate_mbps": "NaN",
             "link_max_rx_bitrate_mbps": "NaN",
             "link_min_rx_bitrate_mbps": "NaN",
-            "link_median_rx_bitrate_mbps": "NaN"
+            "link_median_rx_bitrate_mbps": "NaN",
+            "link_25perc_rx_bitrate_mbps": "NaN",
+            "link_75perc_rx_bitrate_mbps": "NaN"
         }
 
         # Only update "link_*" attributes if the current beacon is connected.
@@ -600,12 +648,14 @@ def write(outarr, args):
                                "direction", "interface", "host", "isp",
                                "duration_s", "transfered_mbytes", "tput_mbps",
                                "std_tput_mbps", "max_tput_mbps",
-                               "min_tput_mbps", "median_tput_mbps"]
+                               "min_tput_mbps", "median_tput_mbps",
+                               "25perc_tput_mbps", "75perc_tput_mbps"]
             case "latency":
                 fieldnames += ["timestamp", "mac", "test_uuid", "type",
                                "interface", "host", "isp", "latency_ms",
                                "jitter_ms", "min_latency_ms", "max_latency_ms",
-                               "median_latency_ms"]
+                               "median_latency_ms", "25perc_latency_ms",
+                               "75perc_latency_ms"]
             case "wifi_scan":
                 fieldnames += ["timestamp", "mac", "test_uuid", "corr_test",
                                "interface", "bssid", "ssid", "rssi_dbm",
@@ -617,14 +667,20 @@ def write(outarr, args):
                                "available_admission_capacity_sec",
                                "link_mean_rssi_dbm", "link_max_rssi_dbm",
                                "link_min_rssi_dbm", "link_median_rssi_dbm",
+                               "link_25perc_rssi_dbm",
+                               "link_75perc_rssi_dbm",
                                "link_mean_tx_bitrate_mbps",
                                "link_max_tx_bitrate_mbps",
                                "link_min_tx_bitrate_mbps",
                                "link_median_tx_bitrate_mbps",
+                               "link_25perc_tx_bitrate_mbps",
+                               "link_75perc_tx_bitrate_mbps",
                                "link_mean_rx_bitrate_mbps",
                                "link_max_rx_bitrate_mbps",
                                "link_min_rx_bitrate_mbps",
-                               "link_median_rx_bitrate_mbps"]
+                               "link_median_rx_bitrate_mbps",
+                               "link_25perc_rx_bitrate_mbps",
+                               "link_75perc_rx_bitrate_mbps"]
 
         csv_writer = csv.DictWriter(
             args.output_file, fieldnames=fieldnames)
