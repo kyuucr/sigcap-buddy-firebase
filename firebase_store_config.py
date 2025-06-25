@@ -102,7 +102,7 @@ def main():
         if (len(values) > 0):
             val = values[0]
             for key in val:
-                if (key != "mac" and val[key]):
+                if (key != "mac"):
                     config[key] = val[key]
 
         for key in config:
