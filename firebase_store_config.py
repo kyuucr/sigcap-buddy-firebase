@@ -67,7 +67,7 @@ def main():
     show_mac = args.show
     if (delete_mac is not None):
         # Delete mode
-        delete_mac = delete_mac.replace("-", ":")
+        delete_mac = delete_mac.replace("-", ":").upper()
         query = db.reference("config").order_by_child("mac").equal_to(
             delete_mac).get()
         keys = list(query.keys())
@@ -78,7 +78,7 @@ def main():
             print(f"Cannot find Wi-Fi entry for MAC {delete_mac}!")
     elif (show_mac is not None):
         # Show mode
-        show_mac = show_mac.replace("-", ":")
+        show_mac = show_mac.replace("-", ":").upper()
         query = db.reference("config").order_by_child("mac").equal_to(
             show_mac).get()
         values = list(query.values())
@@ -89,7 +89,8 @@ def main():
             print(f"Cannot find Wi-Fi entry for MAC {show_mac}!")
     else:
         # Add mode
-        mac = input("Input MAC [{}]: ".format(def_mac)).replace("-", ":")
+        mac = input("Input MAC [{}]: ".format(def_mac)).replace(
+            "-", ":").upper()
         if (mac == ""):
             mac = def_mac
 
