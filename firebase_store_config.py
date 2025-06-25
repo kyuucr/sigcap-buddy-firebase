@@ -4,6 +4,7 @@ from firebase_admin import credentials
 from firebase_admin import db
 from uuid import getnode as get_mac
 import json
+import sys
 
 cred = credentials.Certificate(
     "nd-schmidt-firebase-adminsdk-d1gei-43db929d8a.json")
@@ -12,10 +13,13 @@ firebase_admin.initialize_app(cred, {
 })
 
 default_config = {
+    "rpi_id": "",
     "monitor_interface": "",
     "wireless_interface": "wlan0",
     "speedtest_interval": 60,
     "upload_interval": 0,
+    "iperf_ping_enabled": True,
+    "ookla_enabled": True,
     "iperf_server": "ns-mn1.cse.nd.edu",
     "iperf_minport": 5201,
     "iperf_maxport": 5220,
@@ -29,11 +33,14 @@ default_config = {
 }
 
 helper_dict = {
+    "rpi_id": "ID assigned to the RPI (ex: RPI-01)",
     "monitor_interface": "WLAN interface for monitor mode",
     "wireless_interface": "WLAN interface for data transmission",
     "speedtest_interval": "Speedtest interval in minutes",
     "upload_interval": ("Upload interval in minutes, set to 0 to "
                         "upload right after the tests"),
+    "iperf_ping_enabled": "Enable iPerf and ping measurements?",
+    "ookla_enabled": "Enable Ookla measurements?",
     "iperf_server": "iperf target server",
     "iperf_minport": "Minimum port for iperf",
     "iperf_maxport": "Maximum port for iperf",
@@ -100,11 +107,16 @@ def main():
         for key in config:
             temp = input(helper_dict[key] + f" [{config[key]}]: ")
             if (temp):
-                if (isinstance(default_config[key], int)):
+                if ("enabled" in key):
+                    temp = (temp == "true" or temp == "True")
+                elif (isinstance(default_config[key], int)):
                     temp = int(temp)
                 elif (isinstance(default_config[key], float)):
                     temp = float(temp)
                 config[key] = temp
+            elif (key == "rpi_id" and config[key] == ""):
+                print("RPI-ID cannot be empty!")
+                sys.exit(1)
 
         if (len(keys) > 0):
             db.reference("config").child(keys[0]).update(config)
