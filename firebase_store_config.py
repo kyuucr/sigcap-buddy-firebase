@@ -26,7 +26,8 @@ default_config = {
     "iperf_duration": 5,
     "timeout_s": 120,
     "data_cap_gbytes": 100,
-    "sampling_threshold": 0.25,
+    "sampling_threshold": 1,
+    "active_tests_sampling_threshold": 0.25,
     "broker_addr": "ns-mn1.cse.nd.edu",
     "broker_port": 1883,
     "publish_interval": 600
@@ -47,7 +48,9 @@ helper_dict = {
     "iperf_duration": "iperf duration in seconds",
     "timeout_s": "Command timeout in seconds",
     "data_cap_gbytes": "Data cap in GBytes",
-    "sampling_threshold": "Testing samping threshold [0, 1]",
+    "sampling_threshold": "Testing sampling threshold [0.0, 1.0]",
+    "active_tests_sampling_threshold": ("Active test sampling threshold "
+                                        "[0.0, 1.0]"),
     "broker_addr": "MQTT broker address",
     "broker_port": "MQTT broker port",
     "publish_interval": "MQTT status publish interval in seconds"
