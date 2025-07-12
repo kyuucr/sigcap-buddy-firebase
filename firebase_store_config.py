@@ -14,7 +14,7 @@ firebase_admin.initialize_app(cred, {
 
 default_config = {
     "rpi_id": "",
-    "monitor_interface": "",
+    "monitor_interface": "wlan0",
     "wireless_interface": "wlan0",
     "speedtest_interval": 60,
     "upload_interval": 0,
@@ -24,6 +24,11 @@ default_config = {
     "iperf_minport": 5201,
     "iperf_maxport": 5220,
     "iperf_duration": 5,
+    "ping_target": "ns-mn1.cse.nd.edu",
+    "ping_count": 5,
+    "monitor_duration": 5,
+    "monitor_size": 765,
+    "monitor_mode": "scan",
     "timeout_s": 120,
     "data_cap_gbytes": 100,
     "sampling_threshold": 1,
@@ -45,6 +50,15 @@ helper_dict = {
     "iperf_minport": "Minimum port for iperf",
     "iperf_maxport": "Maximum port for iperf",
     "iperf_duration": "iperf duration in seconds",
+    "ping_target": "ping test target server",
+    "ping_count": "Number of ping packets transmission",
+    "monitor_duration": "Duration of Wi-Fi capture in monitor mode in seconds.",
+    "monitor_size": "Size of each captured packet in bytes",
+    "monitor_mode": ("Wi-Fi capture mode\n"
+                     "  all: All 5 GHz and 6 GHz channels\n"
+                     "  5ghz: 5 GHz channels only\n"
+                     "  6ghz: 6 GHz channels only\n"
+                     "  scan: Only channels captured by last beacon scan\n"),
     "ookla_enabled": "Enable Ookla measurements?",
     "timeout_s": "Command timeout in seconds",
     "data_cap_gbytes": "Data cap in GBytes",
@@ -139,7 +153,7 @@ def main():
         if (config is None):
             config = default_config.copy()
         for key in config:
-            if (key.startswith('iperf')
+            if ((key.startswith('iperf') or key.startswith('ping'))
                     and key != 'iperf_ping_enabled'
                     and not config['iperf_ping_enabled']):
                 continue
