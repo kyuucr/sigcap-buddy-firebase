@@ -34,23 +34,23 @@ default_config = {
 }
 
 helper_dict = {
-    "rpi_id": "ID assigned to the RPI (ex: RPI-01)",
+    "rpi_id": "ID assigned to the RPI [ex: RPI-01]",
     "monitor_interface": "WLAN interface for monitor mode",
     "wireless_interface": "WLAN interface for data transmission",
     "speedtest_interval": "Speedtest interval in minutes",
     "upload_interval": ("Upload interval in minutes, set to 0 to "
                         "upload right after the tests"),
     "iperf_ping_enabled": "Enable iPerf and ping measurements?",
-    "ookla_enabled": "Enable Ookla measurements?",
     "iperf_server": "iperf target server",
     "iperf_minport": "Minimum port for iperf",
     "iperf_maxport": "Maximum port for iperf",
     "iperf_duration": "iperf duration in seconds",
+    "ookla_enabled": "Enable Ookla measurements?",
     "timeout_s": "Command timeout in seconds",
     "data_cap_gbytes": "Data cap in GBytes",
-    "sampling_threshold": "Testing sampling threshold [0.0, 1.0]",
+    "sampling_threshold": "Testing sampling threshold [0.0 to 1.0]",
     "active_tests_sampling_threshold": ("Active test sampling threshold "
-                                        "[0.0, 1.0]"),
+                                        "[0.0 to 1.0]"),
     "broker_addr": "MQTT broker address",
     "broker_port": "MQTT broker port",
     "publish_interval": "MQTT status publish interval in seconds"
@@ -139,7 +139,13 @@ def main():
         if (config is None):
             config = default_config.copy()
         for key in config:
-            temp = input(helper_dict[key] + f" [{config[key]}]: ")
+            if (key.startswith('iperf')
+                    and key != 'iperf_ping_enabled'
+                    and not config['iperf_ping_enabled']):
+                continue
+            temp = input(
+                helper_dict[key] +
+                f" (default={config[key] if config[key] != '' else 'None'}): ")
             if (temp):
                 if ("enabled" in key):
                     temp = (temp == "true" or temp == "True")
