@@ -52,10 +52,9 @@ def main():
             sys.exit(1)
         ssid = input("Input SSID: ")
         passwd = getpass()
-        bssid = input("Input BSSID: ")
 
         wifi_entry = {
-            "rpi_id": rpi_id, "ssid": ssid, "pass": passwd, "bssid": bssid
+            "rpi_id": rpi_id, "ssid": ssid, "pass": passwd
         }
         query = db.reference("wifi_v2").order_by_child("rpi_id").equal_to(
             rpi_id).get()
