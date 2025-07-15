@@ -14,10 +14,15 @@ firebase_admin.initialize_app(cred, {
 
 default_config = {
     "rpi_id": "",
-    "monitor_interface": "wlan0",
-    "wireless_interface": "wlan0",
     "speedtest_interval": 60,
     "upload_interval": 0,
+    "wireless_interface": "wlan0",
+    "wireless_mode": "auto",
+    "wireless_bssid": "",
+    "monitor_interface": "wlan0",
+    "monitor_duration": 5,
+    "monitor_size": 765,
+    "monitor_mode": "scan",
     "iperf_ping_enabled": True,
     "ookla_enabled": True,
     "iperf_server": "ns-mn1.cse.nd.edu",
@@ -26,12 +31,9 @@ default_config = {
     "iperf_duration": 5,
     "ping_target": "ns-mn1.cse.nd.edu",
     "ping_count": 5,
-    "monitor_duration": 5,
-    "monitor_size": 765,
-    "monitor_mode": "scan",
     "timeout_s": 120,
     "data_cap_gbytes": 100,
-    "sampling_threshold": 1,
+    "sampling_threshold": 1.0,
     "active_tests_sampling_threshold": 0.25,
     "broker_addr": "ns-mn1.cse.nd.edu",
     "broker_port": 1883,
@@ -40,11 +42,29 @@ default_config = {
 
 helper_dict = {
     "rpi_id": "ID assigned to the RPI [ex: RPI-01]",
-    "monitor_interface": "WLAN interface for monitor mode",
-    "wireless_interface": "WLAN interface for data transmission",
     "speedtest_interval": "Speedtest interval in minutes",
     "upload_interval": ("Upload interval in minutes, set to 0 to "
                         "upload right after the tests"),
+    "wireless_interface": "WLAN interface for data transmission",
+    "wireless_mode": (
+        "Set Wi-Fi connection mode:\n"
+        "  auto: Connect to any BSSID matching the SSID automatically, "
+            "as chosen by NetworkManager\n"
+        "  2.4ghz: Connect to strongest 2.4 GHz BSSID matching SSID\n"
+        "  5ghz: Connect to strongest 5 GHz BSSID matching SSID\n"
+        "  6ghz: Connect to strongest 6 GHz BSSID matching SSID\n"
+        "  bssid: Connect to a specific BSSID matching SSID\n"),
+    "wireless_bssid": "Input target BSSID",
+    "monitor_interface": ("WLAN interface for Wi-Fi packet capture "
+                          "in monitor mode"),
+    "monitor_duration": "Duration of Wi-Fi capture in seconds",
+    "monitor_size": "Size of each captured packet in bytes",
+    "monitor_mode": ("Wi-Fi capture mode\n"
+                     "  all: All 2.4, 5, and 6 GHz channels\n"
+                     "  2.4ghz: 2.4 GHz channels only\n"
+                     "  5ghz: 5 GHz channels only\n"
+                     "  6ghz: 6 GHz channels only\n"
+                     "  scan: Only channels captured by last beacon scan\n"),
     "iperf_ping_enabled": "Enable iPerf and ping measurements?",
     "iperf_server": "iperf target server",
     "iperf_minport": "Minimum port for iperf",
@@ -52,13 +72,6 @@ helper_dict = {
     "iperf_duration": "iperf duration in seconds",
     "ping_target": "ping test target server",
     "ping_count": "Number of ping packets transmission",
-    "monitor_duration": "Duration of Wi-Fi capture in monitor mode in seconds.",
-    "monitor_size": "Size of each captured packet in bytes",
-    "monitor_mode": ("Wi-Fi capture mode\n"
-                     "  all: All 5 GHz and 6 GHz channels\n"
-                     "  5ghz: 5 GHz channels only\n"
-                     "  6ghz: 6 GHz channels only\n"
-                     "  scan: Only channels captured by last beacon scan\n"),
     "ookla_enabled": "Enable Ookla measurements?",
     "timeout_s": "Command timeout in seconds",
     "data_cap_gbytes": "Data cap in GBytes",
@@ -68,6 +81,11 @@ helper_dict = {
     "broker_addr": "MQTT broker address",
     "broker_port": "MQTT broker port",
     "publish_interval": "MQTT status publish interval in seconds"
+}
+
+valid_inputs = {
+    'wireless_mode': ['auto', '2.4ghz', '5ghz', '6ghz', 'bssid'],
+    'monitor_mode': ['all', '2.4ghz', '5ghz', '6ghz', 'scan'],
 }
 
 
@@ -157,20 +175,39 @@ def main():
                     and key != 'iperf_ping_enabled'
                     and not config['iperf_ping_enabled']):
                 continue
-            temp = input(
-                helper_dict[key] +
-                f" (default={config[key] if config[key] != '' else 'None'}): ")
-            if (temp):
-                if ("enabled" in key):
-                    temp = (temp == "true" or temp == "True")
-                elif (isinstance(default_config[key], int)):
-                    temp = int(temp)
-                elif (isinstance(default_config[key], float)):
-                    temp = float(temp)
-                config[key] = temp
-            elif (key == "rpi_id" and config[key] == ""):
-                print("RPI-ID cannot be empty!")
-                sys.exit(1)
+            if (key == 'wireless_bssid'
+                    and config['wireless_mode'] != 'bssid'):
+                continue
+            is_input_correct = False
+            while (not is_input_correct):
+                temp = input(
+                    f"{helper_dict[key]} (default="
+                    f"{config[key] if config[key] != '' else 'None'}): ")
+                # Assume correct first then check for invalid inputs
+                is_input_correct = True
+                if (temp):
+                    try:
+                        if ("enabled" in key):
+                            temp = (temp == "true" or temp == "True")
+                        elif ('mode' in key and temp not in valid_inputs[key]):
+                            raise Exception(f"{temp} is not valid input "
+                                            f"for {key}")
+                        elif (isinstance(default_config[key], int)):
+                            temp = int(temp)
+                        elif (isinstance(default_config[key], float)):
+                            temp = float(temp)
+                            # May need to specifically check key in the future
+                            if (temp < 0.0 or temp > 1.0):
+                                raise Exception("Value must be between "
+                                                "0.0 and 1.0")
+                    except Exception as e:
+                        print(f"Incorrect input: {temp} !\n{e}")
+                        is_input_correct = False
+                    else:
+                        config[key] = temp
+                elif (key == "rpi_id" and config[key] == ""):
+                    print("RPI-ID cannot be empty!")
+                    is_input_correct = False
 
         if (db_key is not None):
             db.reference("config").child(db_key).update(config)
