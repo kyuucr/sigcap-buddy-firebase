@@ -455,7 +455,7 @@ def get_scan_line(mac, json_dict):
             "channel_num": primary_ch,
             "center_freq0_mhz": primary_freq,
             "center_freq1_mhz": 0,
-            "bw_mhz": 0,
+            "bw_mhz": 20,
             "amendment": "unknown",
             "connected": "unknown" if "connected" not in beacon
             else beacon["connected"],
@@ -464,6 +464,18 @@ def get_scan_line(mac, json_dict):
             "sta_count": "NaN",
             "ch_utilization": "NaN",
             "available_admission_capacity_sec": "NaN",
+            "ap_name": "unknown",
+            "6ghz_ap_type": "unknown",
+            "ht_max_rx_ampdu_size_bytes": "NaN",
+            "ht_max_rx_num_stream": "NaN",
+            "ht_max_tx_num_stream": "NaN",
+            "vht_max_rx_ampdu_size_bytes": "NaN",
+            "vht_max_rx_num_stream": "NaN",
+            "vht_max_tx_num_stream": "NaN",
+            "he_6ghz_max_rx_ampdu_size_bytes": "NaN",
+            "he_max_rx_ampdu_size_extension_bytes": "NaN",
+            "he_max_rx_num_stream": "NaN",
+            "he_max_tx_num_stream": "NaN",
             "link_mean_rssi_dbm": "NaN",
             "link_max_rssi_dbm": "NaN",
             "link_min_rssi_dbm": "NaN",
@@ -489,47 +501,81 @@ def get_scan_line(mac, json_dict):
             for key in links:
                 outtemp[key] = links[key]
 
-        he_element = [x for x in beacon["extras"]
-                      if x["type"] == "HE Operation"]
-        if (len(he_element) > 0):
-            he_element = he_element[0]["elements"]
-            logging.debug(he_element)
+        # HT Operation and Capabilities
+        ht_op = [x for x in beacon["extras"]
+                      if x["type"] == "HT Operation"]
+        if (len(ht_op) > 0):
+            outtemp["amendment"] = "11n"
+            ht_op = ht_op[0]["elements"]
+            logging.debug(ht_op)
 
-            outtemp["amendment"] = "11ax"
+            # Attempt to resolve bandwidth
+            if (ht_op["sta_channel_width"] == 1):
+                ch = wifi_helper.get_channel_from_freq(
+                    primary_freq, 40)
+                if (ch is not None):
+                    outtemp["channel_num"] = ch[0]
+                    outtemp["center_freq0_mhz"] = ch[1]
+                    outtemp["bw_mhz"] = 40
 
-        vht_element = [x for x in beacon["extras"]
+        ht_caps = [x for x in beacon["extras"]
+                      if x["type"] == "HT Capabilities"]
+        if (len(ht_caps) > 0):
+            outtemp["amendment"] = "11n"
+            ht_caps = ht_caps[0]["elements"]
+            logging.debug(ht_caps)
+
+            # Max HT AMPDU size
+            if ("maximum_rx_a_mpdu_length" in ht_caps):
+                outtemp["ht_max_rx_ampdu_size_bytes"] = (
+                    pow(2, 13 + int(ht_caps["maximum_rx_a_mpdu_length"])) - 1)
+
+            # Max HT RX spatial stream
+            if ("rx_mcs_bitmask" in ht_caps):
+                for i in range(4):
+                    mcs_mask = ht_caps["rx_mcs_bitmask"] & (255 << (8 * i))
+                    if (mcs_mask > 0):
+                        outtemp["ht_max_rx_num_stream"] = i + 1
+
+            # Max HT TX spatial stream
+            if ("tx_mcs_set_defined" in ht_caps
+                    and "tx_rx_mcs_set_not_equal" in ht_caps
+                    and ht_caps["tx_mcs_set_defined"] == 1):
+                if (ht_caps["tx_rx_mcs_set_not_equal"] == 0):
+                    outtemp["ht_max_tx_num_stream"] = outtemp[
+                        "ht_max_rx_num_stream"]
+                elif ("tx_max_ss_supported" in ht_caps):
+                    outtemp["ht_max_tx_num_stream"] = (
+                        outtemp["ht_max_tx_num_stream"] + 1)
+
+        # VHT Operation and Capabilities
+        vht_op = [x for x in beacon["extras"]
                        if x["type"] == "VHT Operation"]
-        if (len(vht_element) > 0):
-            vht_element = vht_element[0]["elements"]
-            logging.debug(vht_element)
+        if (len(vht_op) > 0):
+            outtemp["amendment"] = "11ac"
+            vht_op = vht_op[0]["elements"]
+            logging.debug(vht_op)
 
-            if (outtemp["amendment"] == "unknown"):
-                outtemp["amendment"] = "11ac"
-
-            # Resolve bandwidth
-            match vht_element["channel_width"]:
+            # Attempt to further resolve bandwidth > 40 MHz
+            match vht_op["channel_width"]:
                 case 0:
                     # 20 or 40 MHz
                     freq_bw0 = wifi_helper.get_channel_from_num(
                         wifi_helper.get_freq_code(primary_freq),
-                        vht_element["channel_center_freq_0"])
-
-                    # This will resolve the channel bw
+                        vht_op["channel_center_freq_0"])
                     if (freq_bw0 is not None):
                         outtemp["channel_num"] = freq_bw0[0]
                         outtemp["center_freq0_mhz"] = freq_bw0[1]
                         outtemp["bw_mhz"] = freq_bw0[4]
-                    else:
-                        # If channel number not found, this must be 20 Mhz
-                        outtemp["bw_mhz"] = 20
+
                 case 1:
                     # 80 or 160 or 80+80 MHz
                     freq_bw0 = wifi_helper.get_channel_from_num(
                         wifi_helper.get_freq_code(primary_freq),
-                        vht_element["channel_center_freq_0"])
+                        vht_op["channel_center_freq_0"])
                     freq_bw1 = wifi_helper.get_channel_from_num(
                         wifi_helper.get_freq_code(primary_freq),
-                        vht_element["channel_center_freq_1"])
+                        vht_op["channel_center_freq_1"])
 
                     if (freq_bw0 is not None and freq_bw1 is not None):
                         # This might be 160 or 80+80 MHz
@@ -554,7 +600,7 @@ def get_scan_line(mac, json_dict):
                     # 160 MHz (deprecated)
                     freq_bw0 = wifi_helper.get_channel_from_num(
                         wifi_helper.get_freq_code(primary_freq),
-                        vht_element["channel_center_freq_0"])
+                        vht_op["channel_center_freq_0"])
                     if (freq_bw0 is not None):
                         outtemp["channel_num"] = freq_bw0[0]
                         outtemp["center_freq0_mhz"] = freq_bw0[1]
@@ -564,10 +610,10 @@ def get_scan_line(mac, json_dict):
                     outtemp["bw_mhz"] = 160
                     freq_bw0 = wifi_helper.get_channel_from_num(
                         wifi_helper.get_freq_code(primary_freq),
-                        vht_element["channel_center_freq_0"])
+                        vht_op["channel_center_freq_0"])
                     freq_bw1 = wifi_helper.get_channel_from_num(
                         wifi_helper.get_freq_code(primary_freq),
-                        vht_element["channel_center_freq_1"])
+                        vht_op["channel_center_freq_1"])
 
                     # Check the second channel segment first
                     if (freq_bw1 is not None):
@@ -577,25 +623,124 @@ def get_scan_line(mac, json_dict):
                         outtemp["center_freq0_mhz"] = freq_bw0[1]
                         outtemp["channel_num"] = freq_bw0[0]
 
-        ht_element = [x for x in beacon["extras"]
-                      if x["type"] == "HT Operation"]
-        if (len(ht_element) > 0):
-            ht_element = ht_element[0]["elements"]
-            logging.debug(ht_element)
+        vht_caps = [x for x in beacon["extras"]
+                       if x["type"] == "VHT Capabilities"]
+        if (len(vht_caps) > 0):
+            outtemp["amendment"] = "11ac"
+            vht_caps = vht_caps[0]["elements"]
+            logging.debug(vht_caps)
 
-            if (outtemp["amendment"] == "unknown"):
-                outtemp["amendment"] = "11n"
+            # Max VHT AMPDU size
+            if ("max_a_mpdu_length_exponent" in vht_caps):
+                outtemp["vht_max_rx_ampdu_size_bytes"] = (
+                    pow(2, 13 + int(
+                        vht_caps["max_a_mpdu_length_exponent"])) - 1)
 
-            # Resolve bandwidth if it hasn't been resolved yet
-            if (outtemp["bw_mhz"] == 0):
-                outtemp["bw_mhz"] = 20
-                if (ht_element["sta_channel_width"] == 1):
-                    ch = wifi_helper.get_channel_from_freq(
-                        primary_freq, 40)
-                    if (ch is not None):
-                        outtemp["channel_num"] = ch[0]
-                        outtemp["center_freq0_mhz"] = ch[1]
-                        outtemp["bw_mhz"] = 40
+            # Max VHT RX spatial stream
+            if ("supported_rx_mcs_set" in vht_caps):
+                for i in range(8):
+                    mcs_mask = (
+                        (vht_caps["supported_rx_mcs_set"] >> (i * 2)) & 3)
+                    if (mcs_mask != 3):
+                        outtemp["vht_max_rx_num_stream"] = i + 1
+
+            # Max VHT TX spatial stream
+            if ("supported_tx_mcs_set" in vht_caps):
+                for i in range(8):
+                    mcs_mask = (
+                        (vht_caps["supported_tx_mcs_set"] >> (i * 2)) & 3)
+                    if (mcs_mask != 3):
+                        outtemp["vht_max_tx_num_stream"] = i + 1
+
+        # HE Operation and Capabilities
+        he_op = [x for x in beacon["extras"]
+                      if x["type"] == "HE Operation"]
+        if (len(he_op) > 0):
+            outtemp["amendment"] = "11ax"
+            he_op = he_op[0]["elements"]
+            logging.debug(he_op)
+
+            if ("6ghz_info" in he_op):
+                # Attempt to resolve bandwidth for 6 GHz channels
+                # that does not have HT or VHT operation elements
+                freq_bw0 = wifi_helper.get_channel_from_num(
+                    wifi_helper.get_freq_code(primary_freq),
+                    he_op["6ghz_info"]["channel_center_freq_0"])
+                freq_bw1 = wifi_helper.get_channel_from_num(
+                    wifi_helper.get_freq_code(primary_freq),
+                    he_op["6ghz_info"]["channel_center_freq_1"])
+
+                if (freq_bw0 is not None and freq_bw1 is not None):
+                    # This might be 160 or 80+80 MHz
+                    outtemp["bw_mhz"] = 160
+                    outtemp["center_freq0_mhz"] = freq_bw0[1]
+                    outtemp["center_freq1_mhz"] = freq_bw1[1]
+                    if (freq_bw1[4] == 80):
+                        # Must be 80+80 MHz
+                        # Use the first channel segment number,
+                        # may change later
+                        outtemp["channel_num"] = freq_bw0[0]
+                    elif (freq_bw1[4] == 160):
+                        # Must be 160 MHz
+                        # Use the second channel segment number
+                        outtemp["channel_num"] = freq_bw1[0]
+                elif (freq_bw0 is not None):
+                    # This might be 40 or 80 MHz
+                    outtemp["channel_num"] = freq_bw0[0]
+                    outtemp["center_freq0_mhz"] = freq_bw0[1]
+                    outtemp["bw_mhz"] = freq_bw0[4]
+
+                outtemp["6ghz_ap_type"] = (
+                    "LPI" if he_op["6ghz_info"]["regulatory_info"] == 0
+                    else "SP")
+
+        he_caps = [x for x in beacon["extras"]
+                      if x["type"] == "HE Capabilities"]
+        if (len(he_caps) > 0):
+            outtemp["amendment"] = "11ax"
+            he_caps = he_caps[0]["elements"]
+            logging.debug(he_caps)
+
+            bw_str = "20"
+            if ("channel_width_set" in he_caps):
+                if (he_caps["channel_width_set"] & 1 > 0):
+                    bw_str = "40"
+                if (he_caps["channel_width_set"] & 2 > 0):
+                    bw_str = "40/80"
+                if (he_caps["channel_width_set"] & 12 > 0):
+                    bw_str = "160"
+
+            # Check current channel width and correct if necessary
+            if (str(outtemp["bw_mhz"]) not in bw_str):
+                # We pick 80 MHz for 40/80 since we should have picked 40
+                # in VHT or HE Operation
+                bw_mhz = 80 if bw_str == "40/80" else int(bw_str)
+                ch = wifi_helper.get_channel_from_freq(
+                    primary_freq, bw_mhz)
+                if (ch is not None):
+                    outtemp["channel_num"] = ch[0]
+                    outtemp["center_freq0_mhz"] = ch[1]
+                    outtemp["bw_mhz"] = bw_mhz
+
+            bw_key = "<=_80mhz"
+            if (bw_str == "160"):
+                bw_key = "160mhz"
+            # Max HE RX spatial stream
+            mcs_set_key = "supported_rx_mcs_set_" + bw_key
+            if (mcs_set_key in he_caps):
+                for i in range(8):
+                    mcs_mask = ((he_caps[mcs_set_key] >> (i * 2)) & 3)
+                    if (mcs_mask != 3):
+                        outtemp["he_max_rx_num_stream"] = i + 1
+
+            # Max HE TX spatial stream
+            mcs_set_key = "supported_tx_mcs_set_" + bw_key
+            if (mcs_set_key in he_caps):
+                for i in range(8):
+                    mcs_mask = ((he_caps[mcs_set_key] >> (i * 2)) & 3)
+                    if (mcs_mask != 3):
+                        outtemp["he_max_tx_num_stream"] = i + 1
+
 
         tpc_element = [x for x in beacon["extras"]
                        if x["type"] == "TPC Report"]
@@ -665,6 +810,17 @@ def write(outarr, args):
                                "connected", "tx_power_dbm", "link_margin_db",
                                "sta_count", "ch_utilization",
                                "available_admission_capacity_sec",
+                               "ap_name", "6ghz_ap_type",
+                               "ht_max_rx_ampdu_size_bytes",
+                               "ht_max_rx_num_stream",
+                               "ht_max_tx_num_stream",
+                               "vht_max_rx_ampdu_size_bytes",
+                               "vht_max_rx_num_stream",
+                               "vht_max_tx_num_stream",
+                               "he_6ghz_max_rx_ampdu_size_bytes",
+                               "he_max_rx_ampdu_size_extension_bytes",
+                               "he_max_rx_num_stream",
+                               "he_max_tx_num_stream",
                                "link_mean_rssi_dbm", "link_max_rssi_dbm",
                                "link_min_rssi_dbm", "link_median_rssi_dbm",
                                "link_25perc_rssi_dbm",
