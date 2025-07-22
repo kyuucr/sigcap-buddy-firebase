@@ -449,6 +449,7 @@ def get_scan_line(mac, json_dict):
             "interface": interface,
             "bssid": beacon["bssid"],
             "ssid": beacon["ssid"],
+            "ap_name": "unknown",
             "rssi_dbm": int(beacon["rssi"][:(len(beacon["rssi"]) - 4)]),
             "primary_channel_num": primary_ch,
             "primary_freq_mhz": primary_freq,
@@ -776,6 +777,19 @@ def get_scan_line(mac, json_dict):
                 outtemp["available_admission_capacity_sec"] = bss_load_element[
                     "available_admission_cap"] * 32 / 1e6
 
+        vendor_ies = [x for x in beacon["extras"]
+                     if x["type"] == "Vendor Specific"]
+        for elem in [ie['elements'] for ie in vendor_ies]:
+            if (elem['oui'] == '506f9a'
+                    and elem['oui_type'] == 28
+                    and outtemp['ssid'] == ''
+                    and 'ssid' in elem):
+                outtemp['ssid'] = elem['ssid']
+            elif (elem['oui'] == '000b86'
+                    and elem['oui_type'] == 1
+                    and 'ap_name' in elem):
+                outtemp['ap_name'] = elem['ap_name']
+
         logging.debug(outtemp)
         # Only add to list if we got bandwidth resolved
         if (outtemp["bw_mhz"] != 0):
@@ -816,7 +830,8 @@ def write(outarr, args):
                                "75perc_latency_ms"]
             case "wifi_scan":
                 fieldnames += ["timestamp", "mac", "test_uuid", "corr_test",
-                               "interface", "bssid", "ssid", "rssi_dbm",
+                               "interface", "bssid", "ssid", "ap_name",
+                               "rssi_dbm",
                                "primary_channel_num", "primary_freq_mhz",
                                "channel_num", "center_freq0_mhz",
                                "center_freq1_mhz", "bw_mhz", "amendment",
