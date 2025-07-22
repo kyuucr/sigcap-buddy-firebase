@@ -518,6 +518,7 @@ def get_scan_line(mac, json_dict):
                     outtemp["center_freq0_mhz"] = ch[1]
                     outtemp["bw_mhz"] = 40
 
+        ampdu_exponent = 0
         ht_caps = [x for x in beacon["extras"]
                       if x["type"] == "HT Capabilities"]
         if (len(ht_caps) > 0):
@@ -527,8 +528,9 @@ def get_scan_line(mac, json_dict):
 
             # Max HT AMPDU size
             if ("maximum_rx_a_mpdu_length" in ht_caps):
+                ampdu_exponent = ht_caps["maximum_rx_a_mpdu_length"]
                 outtemp["ht_max_rx_ampdu_size_bytes"] = (
-                    pow(2, 13 + int(ht_caps["maximum_rx_a_mpdu_length"])) - 1)
+                    pow(2, 13 + ht_caps["maximum_rx_a_mpdu_length"]) - 1)
 
             # Max HT RX spatial stream
             if ("rx_mcs_bitmask" in ht_caps):
@@ -632,9 +634,9 @@ def get_scan_line(mac, json_dict):
 
             # Max VHT AMPDU size
             if ("max_a_mpdu_length_exponent" in vht_caps):
+                ampdu_exponent = vht_caps["max_a_mpdu_length_exponent"]
                 outtemp["vht_max_rx_ampdu_size_bytes"] = (
-                    pow(2, 13 + int(
-                        vht_caps["max_a_mpdu_length_exponent"])) - 1)
+                    pow(2, 13 + vht_caps["max_a_mpdu_length_exponent"]) - 1)
 
             # Max VHT RX spatial stream
             if ("supported_rx_mcs_set" in vht_caps):
@@ -694,12 +696,23 @@ def get_scan_line(mac, json_dict):
                     "LPI" if he_op["6ghz_info"]["regulatory_info"] == 0
                     else "SP")
 
+        # TODO 6 GHz band caps
+
         he_caps = [x for x in beacon["extras"]
                       if x["type"] == "HE Capabilities"]
         if (len(he_caps) > 0):
             outtemp["amendment"] = "11ax"
             he_caps = he_caps[0]["elements"]
             logging.debug(he_caps)
+
+            # HE AMPDU size extension
+            if ("maximum_a_mpdu_length_exponent_extension" in he_caps
+                    and ampdu_exponent):
+                outtemp["he_max_rx_ampdu_size_extension_bytes"] = pow(
+                    2,
+                    (13 + ampdu_exponent + he_caps[
+                        "maximum_a_mpdu_length_exponent_extension"])
+                ) - 1
 
             bw_str = "20"
             if ("channel_width_set" in he_caps):
