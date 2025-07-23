@@ -15,14 +15,12 @@ import write_csv
 
 
 args = None
-rpi_ids = None
-rpi_start_time = dict()
-rpi_end_time = dict()
+rpi_timings = dict()
 heartbeats = None
 
 
 def process_mac(mac):
-    global rpi_start_time
+    global rpi_timings
     agg_tput_df = None
 
     # 3.1. Write tput
@@ -31,10 +29,10 @@ def process_mac(mac):
               "-d", str(args.log_dir),
               "-m", mac,
               "-l", args.log_level]
-    if mac in rpi_start_time and rpi_start_time[mac]:
-        params += ["--start-time", rpi_start_time[mac]]
-    if mac in rpi_end_time and rpi_end_time[mac]:
-        params += ["--end-time", rpi_end_time[mac]]
+    if mac in rpi_timings and rpi_timings[mac]["start"]:
+        params += ["--start-time", rpi_timings[mac]["start"]]
+    if mac in rpi_timings and rpi_timings[mac]["end"]:
+        params += ["--end-time", rpi_timings[mac]["end"]]
     out_tput = write_csv.read_logs(write_csv.parse(params))
     if (len(out_tput) > 0):
         write_csv.write(out_tput, write_csv.parse(
@@ -56,10 +54,10 @@ def process_mac(mac):
               "-d", str(args.log_dir),
               "-m", mac,
               "-l", args.log_level]
-    if mac in rpi_start_time and rpi_start_time[mac]:
-        params += ["--start-time", rpi_start_time[mac]]
-    if mac in rpi_end_time and rpi_end_time[mac]:
-        params += ["--end-time", rpi_end_time[mac]]
+    if mac in rpi_timings and rpi_timings[mac]["start"]:
+        params += ["--start-time", rpi_timings[mac]["start"]]
+    if mac in rpi_timings and rpi_timings[mac]["end"]:
+        params += ["--end-time", rpi_timings[mac]["end"]]
     out_lat = write_csv.read_logs(write_csv.parse(params))
     if (len(out_lat) > 0):
         write_csv.write(out_lat, write_csv.parse(
@@ -81,10 +79,10 @@ def process_mac(mac):
               "-d", str(args.log_dir),
               "-m", mac,
               "-l", args.log_level]
-    if mac in rpi_start_time and rpi_start_time[mac]:
-        params += ["--start-time", rpi_start_time[mac]]
-    if mac in rpi_end_time and rpi_end_time[mac]:
-        params += ["--end-time", rpi_end_time[mac]]
+    if mac in rpi_timings and rpi_timings[mac]["start"]:
+        params += ["--start-time", rpi_timings[mac]["start"]]
+    if mac in rpi_timings and rpi_timings[mac]["end"]:
+        params += ["--end-time", rpi_timings[mac]["end"]]
     out_scan = write_csv.read_logs(write_csv.parse(params))
     if (len(out_scan) > 0):
         write_csv.write(out_scan, write_csv.parse(
@@ -120,7 +118,7 @@ def process_mac(mac):
         logging.warning(f"No throughput logs for {mac}! Skipping...")
 
     # 3.5. Write heartbeats
-    out_hbeat = firebase_list_devices.get_mac(heartbeats, mac, rpi_ids)
+    out_hbeat = firebase_list_devices.get_mac(heartbeats, mac)
     print(f"Writing heartbeat CSV and JSON for {mac}...")
     if (len(out_hbeat) > 0):
         firebase_list_devices.write(
@@ -179,24 +177,11 @@ def process_mac(mac):
 
 def batch_extract():
     # Setup
-    global rpi_ids, rpi_start_time, heartbeats
+    global rpi_timings, heartbeats
     logging.basicConfig(level=args.log_level.upper())
-    rpi_config = Path(".rpi-config.json")
-    if rpi_config.is_file():
-        with open(rpi_config) as file:
-            rpi_ids = json.load(file)
-    rpi_time_file = Path(".rpi-start-time.json")
-    if rpi_ids is not None and rpi_time_file.is_file():
-        with open(rpi_time_file) as file:
-            temp = json.load(file)
-            for key, val in temp.items():
-                rpi_start_time[rpi_ids[key]] = val
-    rpi_time_file = Path(".rpi-end-time.json")
-    if rpi_ids is not None and rpi_time_file.is_file():
-        with open(rpi_time_file) as file:
-            temp = json.load(file)
-            for key, val in temp.items():
-                rpi_end_time[rpi_ids[key]] = val
+    if args.rpi_timings.is_file():
+        with open(args.rpi_timings) as file:
+            rpi_timings = json.load(file)
 
     last_update = None
     last_update_file = args.outdir.joinpath("last_update.json")
@@ -213,6 +198,7 @@ def batch_extract():
             if entry["mac"].startswith("RPI-")]
     logging.info(macs)
     # Write device states later after it got throughput stats
+
 
     print("2. Download and zip all logs")
     if args.skip_dl:
@@ -294,6 +280,10 @@ def parse(list_args=None):
                         help="Use rsync to server instead of Firebase")
     parser.add_argument("--skip-dl", action="store_true",
                         help="Skip downloading new files from Firebase")
+    parser.add_argument("--rpi-timings", type=Path,
+                        default=Path("./.rpi-timings.json"),
+                        help=("Specify RPI timings file, "
+                              "default='./.rpi-timings.json'"))
     parser.add_argument("-l", "--log-level", default="warning",
                         help="Provide logging level, default is warning'")
     if (list_args is None):
