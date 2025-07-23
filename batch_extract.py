@@ -205,7 +205,16 @@ def batch_extract():
             last_update = json.load(fd)["last_update"]
             print(f"Got last update: {last_update}")
 
-    print("1. Download and zip all logs")
+    print("1. Download device states")
+    heartbeats = firebase_list_devices.fetch_all()
+    device_list = firebase_list_devices.get_list(heartbeats,
+                                                 args.log_dir)
+    macs = [entry["mac"] for entry in device_list
+            if entry["mac"].startswith("RPI-")]
+    logging.info(macs)
+    # Write device states later after it got throughput stats
+
+    print("2. Download and zip all logs")
     if args.skip_dl:
         print("Skipping downloading Firebase files...")
     else:
@@ -218,20 +227,11 @@ def batch_extract():
     print("Zipping all logs...")
     cmd_out = subprocess.run(
         ["zip", "-ur",
-         str(args.outdir.joinpath("all_rawlogs.zip").resolve()),
-         "."], cwd=str(args.log_dir.resolve()),
+         str(args.outdir.joinpath("all_rawlogs.zip").resolve())] + macs,
+        cwd=str(args.log_dir.resolve()),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT).stdout.decode("utf-8")
     logging.info(cmd_out)
-
-    print("2. Download device states")
-    heartbeats = firebase_list_devices.fetch_all()
-    device_list = firebase_list_devices.get_list(heartbeats,
-                                                 args.log_dir,
-                                                 rpi_ids)
-    macs = [entry["mac"] for entry in device_list]
-    logging.info(macs)
-    # Write device states later after it got throughput stats
 
     print("3. Write CSV and JSON for each MAC")
     agg_tput_data = list()
