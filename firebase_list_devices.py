@@ -14,17 +14,17 @@ def write(outarr, args):
     if (args.json):
         args.output_file.write(json.dumps(outarr))
     else:
-        fieldnames = []
+        fieldnames = ["mac", "online",
+                      "start_timestamp", "last_timestamp"]
+        if (args.include_legacy_mac):
+            fieldnames.insert(1, 'rpi_id')
         if (args.mac == "disabled"):
-            fieldnames += ["mac", "rpi_id", "online", "start_timestamp",
-                           "last_timestamp", "last_test_eth", "last_test_wlan",
+            fieldnames += ["last_test_eth", "last_test_wlan",
                            "data_used_gbytes"]
-        else:
-            fieldnames += ["mac", "rpi_id", "online", "start_timestamp",
-                           "last_timestamp"]
         csv_writer = csv.DictWriter(
             args.output_file,
-            fieldnames=fieldnames)
+            fieldnames=fieldnames,
+            extrasaction='ignore')
         csv_writer.writeheader()
         csv_writer.writerows(outarr)
 
@@ -150,7 +150,7 @@ def get_rpi_id(rpi_ids, mac):
         return rpi_id[0]
 
 
-def get_list(heartbeats, log_dir, rpi_ids):
+def get_list(heartbeats, log_dir, rpi_ids=None, include_legacy_mac=False):
     outarr = list()
     now_timestamp = datetime.now(timezone.utc).astimezone()
     logging.info("Current time: %s",
@@ -158,6 +158,9 @@ def get_list(heartbeats, log_dir, rpi_ids):
     data_used = fetch_data_used()
 
     for mac in heartbeats:
+        if (not include_legacy_mac and not mac.startswith("RPI-")):
+            logging.info(f"Skipping legacy mac {mac}.")
+            continue
         heartbeats[mac] = {key: value for key, value in heartbeats[mac].items()
                            if isinstance(value, dict)}
         last = sorted(list(heartbeats[mac].values()),
@@ -190,10 +193,11 @@ def get_list(heartbeats, log_dir, rpi_ids):
             "last_test_wlan": last_tests["wla"],
             "data_used_gbytes": data_used_gb})
 
-    return sorted(outarr, key=lambda x: (~x["online"], x["rpi_id"], x["mac"]))
+    return sorted(outarr,
+                  key=lambda x: (not x["online"], x["rpi_id"], x["mac"]))
 
 
-def get_mac(heartbeats, mac_filter, rpi_ids):
+def get_mac(heartbeats, mac_filter, rpi_ids=None):
     outarr = list()
 
     for mac in heartbeats:
@@ -207,7 +211,8 @@ def get_mac(heartbeats, mac_filter, rpi_ids):
                     "start_timestamp": entry["start_timestamp"],
                     "last_timestamp": entry["last_timestamp"]})
 
-    return sorted(outarr, key=lambda x: (~x["online"], x["mac"]))
+    return sorted(outarr,
+                  key=lambda x: (not x["online"], x["rpi_id"], x["mac"]))
 
 
 def list_devices(args):
@@ -218,7 +223,9 @@ def list_devices(args):
             rpi_ids = json.load(file)
 
     if (args.mac == "disabled"):
-        return get_list(heartbeats, args.log_dir, rpi_ids)
+        return get_list(
+            heartbeats, args.log_dir, rpi_ids,
+            args.include_legacy_mac)
     else:
         return get_mac(heartbeats, args.mac, rpi_ids)
 
@@ -237,6 +244,8 @@ def parse(list_args=None):
     parser.add_argument("--rpi-config", type=Path,
                         default=Path("./.rpi-config.json"),
                         help="Specify RPI config file for RPI-ID translation")
+    parser.add_argument("--include-legacy-mac", action="store_true",
+                        help="Include legacy mac entries.")
     parser.add_argument("-l", "--log-level", default="warning",
                         help="Provide logging level, default is warning'")
     if (list_args is None):
