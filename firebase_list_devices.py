@@ -20,7 +20,7 @@ def write(outarr, args):
             fieldnames.insert(1, 'rpi_id')
         if (args.mac == "disabled"):
             fieldnames += ["last_test_eth", "last_test_wlan",
-                           "data_used_gbytes"]
+                           "data_used_gbytes", "data_cap_gbytes"]
         csv_writer = csv.DictWriter(
             args.output_file,
             fieldnames=fieldnames,
@@ -35,6 +35,14 @@ def fetch_all():
 
 def fetch_data_used():
     return db.reference("data_used").get()
+
+
+def fetch_data_cap():
+    query = db.reference("config").get()
+    return {
+        item["rpi_id"]: item["data_cap_gbytes"]
+        for item in list(query.values())
+        if ("rpi_id" in item and "data_cap_gbytes" in item)}
 
 
 def read_json(file):
@@ -156,6 +164,7 @@ def get_list(heartbeats, log_dir, rpi_ids=None, include_legacy_mac=False):
     logging.info("Current time: %s",
                  now_timestamp.isoformat(timespec="seconds"))
     data_used = fetch_data_used()
+    data_cap = fetch_data_cap()
 
     for mac in heartbeats:
         if (not include_legacy_mac and not mac.startswith("RPI-")):
@@ -182,6 +191,10 @@ def get_list(heartbeats, log_dir, rpi_ids=None, include_legacy_mac=False):
             data_used_gb = sorted(list(temp.values()),
                                   key=lambda x: x["last_timestamp"],
                                   reverse=True)[0]["data_used_gbytes"]
+        # Data cap
+        data_cap_gb = "NaN"
+        if mac in data_cap:
+            data_cap_gb = data_cap[mac]
 
         outarr.append({
             "mac": mac,
@@ -191,7 +204,8 @@ def get_list(heartbeats, log_dir, rpi_ids=None, include_legacy_mac=False):
             "last_timestamp": last["last_timestamp"],
             "last_test_eth": last_tests["eth"],
             "last_test_wlan": last_tests["wla"],
-            "data_used_gbytes": data_used_gb})
+            "data_used_gbytes": data_used_gb,
+            "data_cap_gbytes": data_cap_gb})
 
     return sorted(outarr,
                   key=lambda x: (not x["online"], x["rpi_id"], x["mac"]))
