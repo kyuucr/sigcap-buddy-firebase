@@ -151,7 +151,7 @@ def main():
             sys.exit(1)
     else:
         mac = args.mac.replace("-", ":").upper()
-        config, db_key, _ = retrieve_config(args.mac, "mac")
+        config, db_key, _ = retrieve_config(mac, "mac")
 
     if (args.show):
         # Show mode
