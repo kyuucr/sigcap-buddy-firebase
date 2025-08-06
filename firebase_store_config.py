@@ -127,13 +127,11 @@ def main():
     parser = ArgumentParser(
         prog="firebase_store_config.py",
         description="Store sigcap-buddy configuration to Firebase DB")
-    parser.add_argument("mac", help="input MAC")
+    parser.add_argument("mac", help="input MAC/RPI-ID")
     parser.add_argument("--show", action="store_true",
                         help="show configuration for associated MAC/RPI-ID")
     parser.add_argument("--delete", action="store_true",
                         help="delete configuration for associated MAC/RPI-ID")
-    parser.add_argument("--rpi-id", action="store_true",
-                        help="specify the mac input as RPI-ID instead of MAC")
     args = parser.parse_args()
 
     config = None
@@ -141,7 +139,7 @@ def main():
     mac = None
 
     # Retrieve MAC if RPI-ID is specified
-    if (args.rpi_id):
+    if (args.mac.startswith("RPI-")):
         config, db_key, mac = retrieve_config(args.mac, "rpi_id")
         if (mac is not None):
             print(f"Found MAC {mac} for {args.mac} !")
@@ -205,8 +203,11 @@ def main():
                         is_input_correct = False
                     else:
                         config[key] = temp
-                elif (key == "rpi_id" and config[key] == ""):
-                    print("RPI-ID cannot be empty!")
+                if (key == "rpi_id" and config[key] == ""):
+                    print("RPI-ID cannot be empty !")
+                    is_input_correct = False
+                elif (key == "rpi_id" and not config[key].startswith("RPI-")):
+                    print("RPI-ID must be prefixed with 'RPI-' !")
                     is_input_correct = False
 
         if (db_key is not None):
