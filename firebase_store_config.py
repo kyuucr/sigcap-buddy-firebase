@@ -64,7 +64,8 @@ helper_dict = {
                      "  2.4ghz: 2.4 GHz channels only\n"
                      "  5ghz: 5 GHz channels only\n"
                      "  6ghz: 6 GHz channels only\n"
-                     "  scan: Only channels captured by last beacon scan\n"),
+                     "  scan: Only channels captured by last beacon scan\n"
+                     "  conn: Only channel of connected BSSID\n"),
     "iperf_ping_enabled": "Enable iPerf and ping measurements?",
     "iperf_server": "iperf target server",
     "iperf_minport": "Minimum port for iperf",
@@ -85,7 +86,7 @@ helper_dict = {
 
 valid_inputs = {
     'wireless_mode': ['auto', '2.4ghz', '5ghz', '6ghz', 'bssid'],
-    'monitor_mode': ['all', '2.4ghz', '5ghz', '6ghz', 'scan'],
+    'monitor_mode': ['all', '2.4ghz', '5ghz', '6ghz', 'scan', 'conn'],
 }
 
 
