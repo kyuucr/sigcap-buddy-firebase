@@ -23,6 +23,7 @@ default_config = {
     "monitor_duration": 5,
     "monitor_size": 765,
     "monitor_mode": "scan",
+    "monitor_freq_list": [],
     "iperf_ping_enabled": True,
     "ookla_enabled": True,
     "iperf_server": "ns-mn1.cse.nd.edu",
@@ -65,7 +66,9 @@ helper_dict = {
                      "  5ghz: 5 GHz channels only\n"
                      "  6ghz: 6 GHz channels only\n"
                      "  scan: Only channels captured by last beacon scan\n"
-                     "  conn: Only channel of connected BSSID\n"),
+                     "  conn: Only channel of connected BSSID\n"
+                     "  freq: Input list of frequencies\n"),
+    "monitor_freq_list": "Input list of frequencies, each separated by a comma",
     "iperf_ping_enabled": "Enable iPerf and ping measurements?",
     "iperf_server": "iperf target server",
     "iperf_minport": "Minimum port for iperf",
@@ -86,7 +89,16 @@ helper_dict = {
 
 valid_inputs = {
     'wireless_mode': ['auto', '2.4ghz', '5ghz', '6ghz', 'bssid'],
-    'monitor_mode': ['all', '2.4ghz', '5ghz', '6ghz', 'scan', 'conn'],
+    'monitor_mode': ['all', '2.4ghz', '5ghz', '6ghz', 'scan', 'conn', 'freq'],
+    'monitor_freq_list': [  # As defined in wifi_monitor.py
+        # 2.4 GHz
+        2412, 2417, 2422, 2427, 2432, 2437, 2442, 2447, 2452, 2457, 2462,
+        # 5 GHz
+        5180, 5200, 5220, 5240, 5260, 5280, 5300, 5320, 5500, 5520, 5540, 5560,
+        5580, 5600, 5620, 5640, 5660, 5680, 5700, 5745, 5765, 5785, 5805,
+        # 6 GHz
+        5975, 6055, 6135, 6215, 6295, 6375, 6455, 6535, 6615, 6695, 6775, 6855,
+        6935, 7015]
 }
 
 
@@ -177,11 +189,19 @@ def main():
             if (key == 'wireless_bssid'
                     and config['wireless_mode'] != 'bssid'):
                 continue
+            if (key == 'monitor_freq_list'
+                    and config['monitor_mode'] != 'freq'):
+                continue
             is_input_correct = False
             while (not is_input_correct):
+                default_str = ""
+                if (isinstance(default_config[key], list)):
+                    default_str = (",".join(map(str, config[key]))
+                                   if len(config[key]) > 0 else "Empty")
+                else:
+                    default_str = config[key] if config[key] != '' else 'None'
                 temp = input(
-                    f"{helper_dict[key]} (default="
-                    f"{config[key] if config[key] != '' else 'None'}): ")
+                    f"{helper_dict[key]} (default={default_str}): ")
                 # Assume input is correct then check for invalid inputs
                 is_input_correct = True
                 if (temp):
@@ -213,6 +233,14 @@ def main():
                             if (temp < 0.0 or temp > 1.0):
                                 raise Exception("Value must be between "
                                                 "0.0 and 1.0")
+                        elif (isinstance(default_config[key], list)):
+                            temp = [int(item.strip())
+                                    for item in temp.split(",")]
+                            invalids = [item for item in temp
+                                        if item not in valid_inputs[key]]
+                            if (len(invalids) > 0):
+                                raise Exception("These values are not valid: "
+                                                f"{invalids}")
                     except Exception as e:
                         print(f"Incorrect input: {temp} !\n{e}")
                         is_input_correct = False
