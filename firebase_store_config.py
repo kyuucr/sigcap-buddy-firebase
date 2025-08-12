@@ -182,11 +182,25 @@ def main():
                 temp = input(
                     f"{helper_dict[key]} (default="
                     f"{config[key] if config[key] != '' else 'None'}): ")
-                # Assume correct first then check for invalid inputs
+                # Assume input is correct then check for invalid inputs
                 is_input_correct = True
                 if (temp):
+                    # If input is not empty, check input. Otherwise keep
+                    # previous config.
                     try:
-                        if ("enabled" in key):
+                        if (key == "rpi_id"):
+                            if (not temp.startswith("RPI-")):
+                                raise Exception(
+                                    "RPI-ID must be prefixed with 'RPI-'")
+                            elif (temp != config[key]):
+                                # Attempt to change RPI-ID, check if new RPI-ID
+                                # is already used
+                                _, _, temp_mac = retrieve_config(temp, "rpi_id")
+                                if (temp_mac is not None):
+                                    raise Exception(
+                                        f"{temp} is already exist with "
+                                        f"MAC {temp_mac}")
+                        elif ("enabled" in key):
                             temp = (temp == "true" or temp == "True")
                         elif ('mode' in key and temp not in valid_inputs[key]):
                             raise Exception(f"{temp} is not valid input "
@@ -204,11 +218,9 @@ def main():
                         is_input_correct = False
                     else:
                         config[key] = temp
+                # Last check to ensure RPI-ID is not empty.
                 if (key == "rpi_id" and config[key] == ""):
                     print("RPI-ID cannot be empty !")
-                    is_input_correct = False
-                elif (key == "rpi_id" and not config[key].startswith("RPI-")):
-                    print("RPI-ID must be prefixed with 'RPI-' !")
                     is_input_correct = False
 
         if (db_key is not None):
