@@ -33,7 +33,6 @@ def download_firebase(args):
     all_files = list()
     if args.start_date:
         # List files from start_date, if it is set
-        now = datetime.now(timezone.utc).astimezone()
         start_time = args.start_date
         # Make start_time offset-aware
         if (start_time.tzinfo is None
@@ -41,7 +40,16 @@ def download_firebase(args):
             start_time = start_time.astimezone()
         # Start from one day prior, just to be sure
         start_time -= timedelta(days=1)
-        while start_time < now:
+        # Get end date if exist
+        end_time = datetime.now(timezone.utc).astimezone()
+        if args.end_date:
+            end_time = args.end_date
+            # Make end_time offset-aware
+            if (end_time.tzinfo is None
+                    or end_time.tzinfo.utcoffset(end_time) is None):
+                end_time = end_time.astimezone()
+
+        while start_time < end_time:
             glob_str = f"*/*/{start_time.date().isoformat()}*"
             logging.info(f"glob_str={glob_str}")
             start_time += timedelta(days=1)
@@ -52,6 +60,7 @@ def download_firebase(args):
                 "name": file.name,
                 "crc32c": file.crc32c
             } for file in iter_blobs]
+
         # List log files
         iter_blobs = bucket.list_blobs(
             fields="items(name,crc32c),nextPageToken",
@@ -60,6 +69,7 @@ def download_firebase(args):
             "name": file.name,
             "crc32c": file.crc32c
         } for file in iter_blobs]
+
     else:
         # List all files, takes longer
         iter_blobs = bucket.list_blobs(
@@ -136,6 +146,11 @@ def parse(list_args=None):
     parser.add_argument("-s", "--start-date",
                         type=lambda s: datetime.fromisoformat(s),
                         help=("Specify the start date from which the files "
+                              "will be downloaded. Use ISO format, ex: "
+                              "2024-05-22"))
+    parser.add_argument("-e", "--end-date",
+                        type=lambda s: datetime.fromisoformat(s),
+                        help=("Specify the end date from which the files "
                               "will be downloaded. Use ISO format, ex: "
                               "2024-05-22"))
     parser.add_argument("-l", "--log-level", default="warning",
