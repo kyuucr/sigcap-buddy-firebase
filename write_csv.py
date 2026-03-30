@@ -549,7 +549,7 @@ def get_scan_line(mac, json_dict):
                         "ht_max_rx_num_stream"]
                 elif ("tx_max_ss_supported" in ht_caps):
                     outtemp["ht_max_tx_num_stream"] = (
-                        outtemp["ht_max_tx_num_stream"] + 1)
+                        ht_caps["tx_max_ss_supported"] + 1)
 
         # VHT Operation and Capabilities
         vht_op = [x for x in beacon["extras"]
