@@ -1,0 +1,6 @@
+crc32c==2.7.1
+firebase_admin==6.9.0
+matplotlib==3.10.8
+numpy==2.4.4
+pandas==3.0.2
+protobuf==7.34.1
